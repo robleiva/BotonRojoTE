@@ -1,0 +1,127 @@
+"""Orquesta el calculo diario: recolectar -> registrar -> actualizar estado -> pronosticar indice -> publicar.
+Uso: python -m ilpi.run_daily"""
+import os
+import datetime as dt
+import numpy as np
+import pandas as pd
+from . import colectores as col, pipeline as pl, reporte
+from .config import *
+
+
+def _leer(ruta, fechas=()):
+    if os.path.exists(ruta):
+        d = pd.read_csv(ruta)
+        for c in fechas:
+            if c in d:
+                d[c] = pd.to_datetime(d[c])
+        return d
+    return pd.DataFrame()
+
+
+def _upsert(nuevo, previo, clave):
+    if previo.empty:
+        return nuevo
+    return pd.concat([previo, nuevo]).drop_duplicates(subset=clave, keep="last")
+
+
+def cargar_terreno():
+    t = _leer(F_TERRENO)
+    out = {}
+    pesos = {"pastizal": 1.0, "matorral": 0.85, "plantacion": 0.9, "bosque_nativo": 0.5, "agricola": 0.4, "sin_combustible": 0.0}
+    for _, r in t.iterrows():
+        out[r["Punto"]] = {"slope": float(r["slope"]) if pd.notna(r["slope"]) else 10.0,
+                           "aspect": float(r["aspect"]) if pd.notna(r["aspect"]) else np.nan,
+                           "fuel_w": pesos.get(str(r["fuel_class"]).strip(), 0.85),
+                           "ndmi": float(r["ndmi"]) if pd.notna(r.get("ndmi", np.nan)) else np.nan}
+    return out
+
+
+def main():
+    os.makedirs(HIST, exist_ok=True); os.makedirs(DOCS, exist_ok=True)
+    ahora = pd.Timestamp.now(tz=ZONA)
+    hoy = ahora.tz_localize(None).normalize()
+    print(f"== ILPI {ahora:%Y-%m-%d %H:%M} (hora de Chile)")
+
+    # 1. Estaciones -> historico horario
+    api, app = os.environ.get("AMBIENT_API_KEY", "").strip(), os.environ.get("AMBIENT_APPLICATION_KEY", "").strip()
+    nuevas = [col.fetch_ambient(col.formatear_mac(os.environ.get(var, "")), pto, api, app) for pto, var in ESTACIONES.items()]
+    nuevas = [n for n in nuevas if not n.empty]
+    obs = _leer(F_OBS, ["Fecha_Local"])
+    if nuevas:
+        obs = _upsert(pd.concat(nuevas), obs, ["Punto", "Fecha_Local"])
+        obs.to_csv(F_OBS, index=False)
+    print(f"[estaciones] {0 if obs.empty else len(obs)} registros horarios en historico")
+
+    # 2. Modelos (Open-Meteo): 15 h registrado (pasado) y pronostico
+    reg_modelo, pron = [], []
+    for pto, m in PUNTOS.items():
+        mods, z = col.fetch_openmeteo(m["lat"], m["lon"], past_days=SPINUP_DIAS, forecast_days=DIAS_PRON + 1)
+        for nombre, dfh in mods.items():
+            c = pl.clima_15h(dfh)
+            if c.empty:
+                continue
+            c["Punto"], c["z_ref"] = pto, z
+            pron.append(c[c["Fecha"] >= hoy].assign(Modelo=nombre))
+            if nombre == "ECMWF":
+                reg_modelo.append(c[c["Fecha"] < hoy].assign(Fuente="ECMWF"))
+    if not reg_modelo or not pron:
+        raise SystemExit("Sin datos de Open-Meteo: no se emite indice hoy (el estado no se modifica).")
+    reg_modelo, pron = pd.concat(reg_modelo), pd.concat(pron)
+    pron = pron[pron["Fecha"] <= hoy + pd.Timedelta(days=DIAS_PRON)]
+
+    # 3. Clima registrado: estacion (si esta completa) > modelo
+    reg = reg_modelo.copy()
+    for pto in ESTACIONES:
+        o = obs[obs["Punto"] == pto] if not obs.empty else pd.DataFrame()
+        c = pl.clima_15h(o)
+        if c.empty:
+            continue
+        c = c[(c["Fecha"] < hoy)].dropna(subset=["T", "RH", "V", "PP24"])
+        c["Punto"], c["Fuente"], c["z_ref"] = pto, "ESTACION", np.nan
+        reg = pd.concat([reg[~((reg["Punto"] == pto) & reg["Fecha"].isin(c["Fecha"]))], c])
+    prev_reg = _leer(F_REG, ["Fecha"])
+    reg_total = _upsert(reg, prev_reg, ["Punto", "Fecha"])
+    reg_total.to_csv(F_REG, index=False)
+
+    # 4. Estado + indice
+    estado = _leer(F_ESTADO, ["Fecha"])
+    if estado.empty:
+        estado = pd.DataFrame(columns=["Punto", "Fecha", "FFMC", "M", "Calidad", "Fuente"])
+    nuevo_estado, ilpi = pl.calcular(reg_total, pron, estado, cargar_terreno(), hoy)
+    pd.concat([estado, nuevo_estado]).drop_duplicates(["Punto", "Fecha"], keep="last").to_csv(F_ESTADO, index=False)
+    hist = _upsert(ilpi, _leer(F_ILPI, ["Emision", "Fecha_Valida"]), ["Emision", "Punto", "Modelo", "Fecha_Valida"])
+    hist.to_csv(F_ILPI, index=False)
+
+    # 5. Pronostico del clima por modelo, archivado (para verificar despues)
+    p_arch = _upsert(pron.assign(Emision=hoy), _leer(F_PRON, ["Fecha", "Emision"]), ["Emision", "Punto", "Modelo", "Fecha"])
+    p_arch.to_csv(F_PRON, index=False)
+
+    # 6. WRF-SMN: solo se archiva (no alimenta el indice en esta version)
+    if os.environ.get("USAR_WRF", "1") == "1":
+        try:
+            utc = dt.datetime.now(dt.timezone.utc)
+            corrida = dt.datetime(utc.year, utc.month, utc.day, 0) - (dt.timedelta(hours=12) if utc.hour < 7 else dt.timedelta())
+            w = col.fetch_wrf(corrida)
+            if not w.empty:
+                filas = []
+                for pto, g in w.groupby("Punto"):
+                    c = pl.clima_15h(g)
+                    if not c.empty:
+                        filas.append(c.assign(Punto=pto, Modelo="WRF", Emision=hoy, z_ref=np.nan))
+                if filas:
+                    _upsert(pd.concat(filas), _leer(F_PRON, ["Fecha", "Emision"]), ["Emision", "Punto", "Modelo", "Fecha"]).to_csv(F_PRON, index=False)
+        except Exception as e:
+            print(f"[WRF] omitido: {e}")
+
+    # 7. Salidas
+    stamp = f"{ahora:%Y-%m-%d %H:%M} (hora de Chile)"
+    hoy_df = ilpi
+    with open(os.path.join(DOCS, "index.html"), "w", encoding="utf-8") as f:
+        f.write(reporte.html(hoy_df, hist, stamp))
+    with open(os.path.join(DOCS, "ilpi_ultimo.json"), "w", encoding="utf-8") as f:
+        f.write(reporte.json_salida(hoy_df, stamp))
+    print(hoy_df[hoy_df["Modelo"] == "ECMWF"].pivot(index="Punto", columns="Fecha_Valida", values="Clase").to_string())
+
+
+if __name__ == "__main__":
+    main()

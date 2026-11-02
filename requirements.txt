@@ -1,0 +1,11 @@
+numpy
+pandas
+requests
+plotly
+xarray
+h5netcdf
+h5py
+netCDF4
+s3fs
+cartopy
+pytest

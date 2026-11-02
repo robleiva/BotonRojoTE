@@ -1,0 +1,69 @@
+name: ILPI diario
+
+on:
+  schedule:
+    - cron: '30 8 * * *'      # 08:30 UTC = 05:30 (verano) / 04:30 (invierno) hora de Chile
+  workflow_dispatch:
+
+concurrency:
+  group: ilpi-diario
+  cancel-in-progress: false
+
+jobs:
+  calcular:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      - name: Instalar dependencias
+        run: pip install -r requirements.txt
+
+      - name: Pruebas
+        run: python -m pytest -q
+
+      - name: Calcular indice
+        env:
+          AMBIENT_API_KEY: ${{ secrets.AMBIENT_API_KEY }}
+          AMBIENT_APPLICATION_KEY: ${{ secrets.AMBIENT_APPLICATION_KEY }}
+          MAC_PORTILLO: ${{ secrets.MAC_PORTILLO }}
+          MAC_TINGUIRIRICA: ${{ secrets.MAC_TINGUIRIRICA }}
+          USAR_WRF: '1'
+        run: python -m ilpi.run_daily
+
+      - name: Guardar historico y pagina
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add historico/ docs/
+          git diff --staged --quiet || git commit -m "Auto: ILPI $(date -u +%F) [skip ci]"
+          git push
+
+  publicar:
+    # Solo si defines la variable del repositorio PUBLICAR_PAGES = true (y tu plan permite Pages)
+    needs: calcular
+    if: ${{ vars.PUBLICAR_PAGES == 'true' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/configure-pages@v4
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+      - id: deployment
+        uses: actions/deploy-pages@v4
