@@ -4,7 +4,7 @@ import os
 import datetime as dt
 import numpy as np
 import pandas as pd
-from . import colectores as col, pipeline as pl, reporte, grilla
+from . import colectores as col, pipeline as pl, reporte, grilla, firms
 from .config import *
 
 
@@ -112,6 +112,21 @@ def main():
                     _upsert(pd.concat(filas), _leer(F_PRON, ["Fecha", "Emision"]), ["Emision", "Punto", "Modelo", "Fecha"]).to_csv(F_PRON, index=False)
         except Exception as e:
             print(f"[WRF] omitido: {e}")
+
+    # 6b. Focos de calor NASA FIRMS (verificacion y calibracion futura; no alimenta el indice)
+    clave_firms = os.environ.get("FIRMS_MAP_KEY", "").strip()
+    if clave_firms:
+        try:
+            nuevos, errores = firms.fetch_todas(clave_firms, hoy)
+            for e in errores:
+                print(f"[FIRMS] {e}")
+            acum = firms.acumular(nuevos, _leer(F_FOCOS))
+            acum.to_csv(F_FOCOS, index=False)
+            print(f"[FIRMS] {len(nuevos)} focos descargados, {len(acum)} acumulados")
+        except Exception as e:
+            print(f"[FIRMS] omitido: {e}")
+    else:
+        print("[FIRMS] sin clave (FIRMS_MAP_KEY): se omite")
 
     # 7. Salidas
     stamp = f"{ahora:%Y-%m-%d %H:%M} (hora de Chile)"

@@ -34,6 +34,7 @@ jobs:
           AMBIENT_APPLICATION_KEY: ${{ secrets.AMBIENT_APPLICATION_KEY }}
           MAC_PORTILLO: ${{ secrets.MAC_PORTILLO }}
           MAC_TINGUIRIRICA: ${{ secrets.MAC_TINGUIRIRICA }}
+          FIRMS_MAP_KEY: ${{ secrets.FIRMS }}
           USAR_WRF: '1'
         run: python -m ilpi.run_daily
 
