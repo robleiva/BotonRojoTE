@@ -4,7 +4,7 @@ import os
 import datetime as dt
 import numpy as np
 import pandas as pd
-from . import colectores as col, pipeline as pl, reporte
+from . import colectores as col, pipeline as pl, reporte, grilla
 from .config import *
 
 
@@ -116,8 +116,14 @@ def main():
     # 7. Salidas
     stamp = f"{ahora:%Y-%m-%d %H:%M} (hora de Chile)"
     hoy_df = ilpi
+    mapa = None
+    try:
+        mapa = grilla.calcular_mapa(reg_total, pron, hoy, F_GRILLA)
+        print(f"[mapa] {len(mapa['fechas'])} dias, {mapa['resumen'][0]['Ha_combustible']} ha con combustible")
+    except Exception as e:                      # el mapa nunca debe impedir la emision por punto
+        print(f"[mapa] omitido: {e}")
     with open(os.path.join(DOCS, "index.html"), "w", encoding="utf-8") as f:
-        f.write(reporte.html(hoy_df, hist, stamp))
+        f.write(reporte.html(hoy_df, hist, stamp, mapa))
     with open(os.path.join(DOCS, "ilpi_ultimo.json"), "w", encoding="utf-8") as f:
         f.write(reporte.json_salida(hoy_df, stamp))
     print(hoy_df[hoy_df["Modelo"] == "ECMWF"].pivot(index="Punto", columns="Fecha_Valida", values="Clase").to_string())

@@ -62,3 +62,11 @@ Por qué un índice propio: el FWI global del ECMWF tuvo desempeño "excepcional
 
 ## Referencias
 Van Wagner (1987), *Development and structure of the Canadian Forest Fire Weather Index System*. · Di Giuseppe et al. (2020), NHESS 20, 2365. · Gajardo et al. (2025), *Fire* 8(3), 113. · Bohlmann y Laine (2024), NHESS 24, 4225.
+
+
+## Mapa por celda (v0.2)
+- Terreno a 90 m (datos/terreno_90m.npz): altitud, pendiente, exposición y peso de combustible (media ponderada por área de ESA WorldCover 10 m; pesos: arbolado 0,5, matorral 0,85, pastizal 1,0, cultivo 0,4, suelo desnudo/ralo 0,1, musgo/liquen 0,3, urbano/nieve/agua 0). Cobertura solo hasta la longitud -70,726 (no incluye La Rufina ni San Fernando).
+- Clima: los puntos (estación o ECMWF) se llevan a 1.500 m, se interpolan por distancia inversa al cuadrado y se corrigen a la altitud de cada celda; viento con media vectorial.
+- FFMC por celda: se reconstruye en cada corrida con los últimos 30 días registrados (F0 = 85) y se continúa con el pronóstico ECMWF.
+- Se colorean solo celdas con peso de combustible >= 0,15. Clases provisorias (30/50/65/80), sin calibrar.
+- Limitaciones: WorldCover no distingue bosque nativo de plantación; sin NDMI ni nieve; el viento no incorpora efectos del relieve; la lluvia no varía con la altitud.

@@ -11,7 +11,8 @@ de incendios; la referencia oficial es CONAF / SENAPRED.
 4. **Estado de humedad del combustible fino** (módulo FFMC de Van Wagner, 1987) que se arrastra día a día y se guarda en `historico/estado_ffmc.csv`.
 5. **Índice** = sequedad del combustible muerto^0,45 × combustible^0,35 × propagación^0,20 (media geométrica ponderada).
    Detalle y supuestos en `ESPECIFICACION.md`.
-6. Salida: `docs/index.html`, `docs/ilpi_ultimo.json` y el archivo `historico/ilpi_diario.csv` (todo lo emitido, para verificar después).
+6. Mapa: el índice también se calcula por celda de 90 m en toda la cuenca (`ilpi/grilla.py`) con DEM, pendiente, exposición y cobertura (ESA WorldCover) de `datos/terreno_90m.npz`, que se genera una vez con `scripts/preparar_terreno.py` desde los TIFF de la tesis. El clima de los puntos se interpola por distancia y se corrige por altitud.
+7. Salida: `docs/index.html`, `docs/ilpi_ultimo.json` y el archivo `historico/ilpi_diario.csv` (todo lo emitido, para verificar después).
 
 El **WRF-SMN** se descarga y archiva (`historico/clima_pronostico.csv`) pero **todavía no alimenta el índice**: los nombres de sus
 variables de humedad y viento no están verificados. En el log de la primera corrida busca las líneas `[WRF] variables del archivo`.
@@ -28,7 +29,7 @@ La primera corrida **se inicializa sola**: toma 60 días hacia atrás desde Open
 ## Limitaciones conocidas (versión 0.1)
 - Pesos y clases son **provisorios**: se recalibrarán con focos de calor (NASA FIRMS) e incendios históricos.
 - Sin nieve ni NDMI: a inicios de temporada puede sobrestimar el peligro en la alta cuenca.
-- Las dos estaciones están a ~1.450 m; los puntos bajos (HLH, La Rufina, San Fernando) dependen del modelo, corregido por altitud.
+- Las dos estaciones están a ~1.450 m; el punto bajo (HLH, 730 m) depende del modelo, corregido por altitud.
 - Si falta un día de datos, el estado se arrastra y el día se marca con `*` (calidad `sin_dato`).
 - El repositorio no incluye ningún punto de carácter personal; mantenlo así si lo haces público.
 
