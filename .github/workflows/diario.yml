@@ -30,8 +30,8 @@ jobs:
 
       - name: Calcular indice
         env:
-          AMBIENT_API_KEY: ${{ secrets.AMBIENT_API_KEY }}
-          AMBIENT_APPLICATION_KEY: ${{ secrets.AMBIENT_APPLICATION_KEY }}
+          AMBIENT_API_KEY: ${{ secrets.AWN }}
+          AMBIENT_APPLICATION_KEY: ${{ secrets.AWN_APPLICATION_KEY }}
           MAC_PORTILLO: ${{ secrets.MAC_PORTILLO }}
           MAC_TINGUIRIRICA: ${{ secrets.MAC_TINGUIRIRICA }}
           FIRMS_MAP_KEY: ${{ secrets.FIRMS }}
