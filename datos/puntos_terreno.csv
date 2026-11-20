@@ -1,8 +1,8 @@
 Punto,slope,aspect,fuel_class,ndmi,nota
-Termas del Flaco,10,,matorral,,PLACEHOLDER: corregir clase de combustible; correr scripts/calcular_terreno.py para pendiente y exposicion
-BT Tinguiririca,10,,matorral,,PLACEHOLDER
-BT Portillo,10,,matorral,,PLACEHOLDER
-HLC,10,,bosque_nativo,,Clase definida por el usuario (2026-11-20)
-HLH,10,,bosque_nativo,,Clase definida por el usuario (2026-11-20)
-La Rufina,10,,matorral,,PLACEHOLDER
-San Fernando,10,,agricola,,PLACEHOLDER
+Termas del Flaco,5,226,pastizal,,Pastizal 62-78% en 0.5-1 km (WorldCover 10 m); pendiente y exposicion del DEM 30 m
+BT Tinguiririca,7,230,pastizal,,Pastizal 41-60% en 0.5-1 km (WorldCover 10 m); pendiente y exposicion del DEM 30 m
+BT Portillo,7,284,pastizal,,Pastizal 45-62% y arbolado 16-22% (WorldCover 10 m); pendiente y exposicion del DEM 30 m
+HLC,13,257,bosque_nativo,,Arbolado 49-57% (WorldCover 10 m); clase definida por el usuario; pendiente y exposicion del DEM 30 m
+HLH,10,27,bosque_nativo,,Arbolado 46% y matorral 30-41% (WorldCover 10 m); clase definida por el usuario; pendiente y exposicion del DEM 30 m
+La Rufina,10,,matorral,,PLACEHOLDER: fuera del raster de la tesis
+San Fernando,10,,agricola,,PLACEHOLDER: fuera del raster de la tesis
