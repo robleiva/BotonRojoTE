@@ -2,7 +2,7 @@ Punto,slope,aspect,fuel_class,ndmi,nota
 Termas del Flaco,10,,matorral,,PLACEHOLDER: corregir clase de combustible; correr scripts/calcular_terreno.py para pendiente y exposicion
 BT Tinguiririca,10,,matorral,,PLACEHOLDER
 BT Portillo,10,,matorral,,PLACEHOLDER
-HLC,10,,matorral,,PLACEHOLDER
-HLH,10,,matorral,,PLACEHOLDER
+HLC,10,,bosque_nativo,,Clase definida por el usuario (2026-11-20)
+HLH,10,,bosque_nativo,,Clase definida por el usuario (2026-11-20)
 La Rufina,10,,matorral,,PLACEHOLDER
 San Fernando,10,,agricola,,PLACEHOLDER
