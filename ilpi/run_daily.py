@@ -138,7 +138,7 @@ def main():
     except Exception as e:                      # el mapa nunca debe impedir la emision por punto
         print(f"[mapa] omitido: {e}")
     with open(os.path.join(DOCS, "index.html"), "w", encoding="utf-8") as f:
-        f.write(reporte.html(hoy_df, hist, stamp, mapa, logo=os.path.exists(os.path.join(DOCS, "logo.png"))))
+        f.write(reporte.html(hoy_df, hist, stamp, mapa, logo=os.path.exists(os.path.join(DOCS, "img", "logo-white.png"))))
     with open(os.path.join(DOCS, "ilpi_ultimo.json"), "w", encoding="utf-8") as f:
         f.write(reporte.json_salida(hoy_df, stamp))
     print(hoy_df[hoy_df["Modelo"] == "ECMWF"].pivot(index="Punto", columns="Fecha_Valida", values="Clase").to_string())

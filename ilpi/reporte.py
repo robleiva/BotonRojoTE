@@ -94,48 +94,59 @@ m.fitBounds(D.lim);var capa=null,btns=[];
 function ver(i){if(capa)m.removeLayer(capa);capa=L.imageOverlay("data:image/png;base64,"+D.dias[i].png,D.lim,{opacity:0.85,interactive:false}).addTo(m);
 btns.forEach(function(b,j){b.className=j==i?"tab on":"tab"});}
 D.dias.forEach(function(d,i){var b=document.createElement("button");b.textContent=d.etq;b.className="tab";b.onclick=function(){ver(i)};document.getElementById("dias").appendChild(b);btns.push(b)});
-D.pts.forEach(function(p){var c=D.color[p.c[0]]||"#555";L.circleMarker([p.lat,p.lon],{radius:8,color:"#102a43",weight:2,fillColor:c,fillOpacity:1}).addTo(m).bindTooltip("<b>"+p.n+"</b><br>"+p.c.map(function(x,k){return x+" "+p.s[k]}).join("<br>"));});
+D.pts.forEach(function(p){var c=D.color[p.c[0]]||"#555";L.circleMarker([p.lat,p.lon],{radius:8,color:"#414042",weight:2,fillColor:c,fillOpacity:1}).addTo(m).bindTooltip("<b>"+p.n+"</b><br>"+p.c.map(function(x,k){return x+" "+p.s[k]}).join("<br>"));});
 ver(0);})();</script>"""
 
 CSS = """
-:root{--azul:#0b3a5b;--azul2:#134e7a;--acento:#00a3a1;--fondo:#f3f6f9;--tinta:#1f2933;--gris:#627d98;--linea:#d9e2ec}
+@font-face{font-family:'Intro Book Alt';src:url('fonts/Intro-Book-Alt.otf') format('opentype');font-weight:400;font-style:normal;font-display:swap}
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700&display=swap');
+:root{--cyan:#00ABE5;--teal:#5BBDB5;--green:#7AB929;--cyan-x:#E5F5FD;--teal-x:#E8F6F5;--green-x:#EEF8DC;
+--dark:#414042;--mid:#7F7F7F;--light:#C8C9CB;--bg:#F5F7F8;--brand:'Intro Book Alt','Nunito',sans-serif;--body:'Nunito','Intro Book Alt',sans-serif;
+--r-sm:6px;--r-md:12px;--r-lg:20px;--sombra:0 2px 12px rgba(0,174,239,.10)}
 *{box-sizing:border-box}
-body{margin:0;background:var(--fondo);color:var(--tinta);font-family:-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;line-height:1.5}
-header{background:linear-gradient(120deg,var(--azul) 0%,var(--azul2) 100%);color:#fff;border-bottom:4px solid var(--acento)}
+body{margin:0;background:var(--bg);color:var(--dark);font-family:var(--body);font-size:16px;line-height:1.5}
+h1,h2,h3{font-family:var(--brand);font-weight:400;line-height:1.2;margin:0}
+header{background:var(--cyan);color:#fff;position:relative;overflow:hidden}
+header:after{content:"";position:absolute;right:-60px;top:-60px;width:240px;height:240px;border-radius:50%;background:rgba(255,255,255,.12)}
 .w{max-width:1120px;margin:0 auto;padding:0 20px}
-.cab{display:flex;align-items:center;gap:18px;padding:22px 20px;flex-wrap:wrap}
-.cab img{height:46px;background:#fff;border-radius:6px;padding:6px 10px}
-.cab h1{margin:0;font-size:26px;font-weight:650;letter-spacing:.2px}
-.cab p{margin:2px 0 0;opacity:.85;font-size:14px}
-.cab .fecha{margin-left:auto;text-align:right;font-size:13px;opacity:.9}
-.aviso{background:#fff7e6;border-left:5px solid #f08c00;border-radius:6px;padding:12px 16px;font-size:14px;margin:20px 0}
-.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px;margin:0 0 6px}
-.kpi{background:#fff;border:1px solid var(--linea);border-radius:10px;padding:16px 18px;border-top:3px solid var(--acento)}
-.kpi-t{font-size:12px;text-transform:uppercase;letter-spacing:.6px;color:var(--gris);font-weight:600}
-.kpi-v{font-size:22px;font-weight:650;margin:6px 0 2px;color:var(--azul)}.kpi-v .num{font-size:30px}
-.kpi-s{font-size:13px;color:var(--gris)}
-section{background:#fff;border:1px solid var(--linea);border-radius:10px;padding:20px 22px;margin:18px 0}
-section h2{margin:0 0 4px;font-size:18px;color:var(--azul)}
-section .nota{margin:0 0 14px;font-size:13px;color:var(--gris)}
-.chip{display:inline-block;padding:3px 11px;border-radius:999px;font-weight:650;font-size:13px;white-space:nowrap}
-#mapa{height:540px;border-radius:8px;border:1px solid var(--linea)}
-.tabs{margin-bottom:10px;display:flex;gap:6px;flex-wrap:wrap}
-.tab{border:1px solid var(--linea);background:#fff;color:var(--azul);padding:7px 14px;border-radius:6px;cursor:pointer;font-size:14px}
-.tab.on{background:var(--azul);color:#fff;border-color:var(--azul)}
-table{border-collapse:collapse;width:100%}
-th{background:var(--azul);color:#fff;font-weight:600;font-size:13px;padding:9px 10px;text-align:center}
+.cab{display:flex;align-items:center;gap:28px;padding:26px 20px;flex-wrap:wrap;position:relative;z-index:1}
+.cab img{height:64px;width:auto}
+.cab h1{font-size:30px;color:#fff}
+.cab p{margin:4px 0 0;font-size:15px;color:#fff}
+.cab .fecha{margin-left:auto;text-align:right;font-size:14px;color:#fff}
+.cab .fecha b{font-weight:700}
+.aviso{background:var(--green-x);border:1px solid var(--green);border-radius:var(--r-md);padding:14px 18px;font-size:14px;margin:22px 0}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:16px;margin:0 0 6px}
+.kpi{background:#fff;border-radius:var(--r-lg);padding:18px 20px;box-shadow:var(--sombra)}
+.kpi-t{font-size:14px;font-weight:600;color:var(--mid)}
+.kpi-v{font-family:var(--brand);font-size:22px;margin:6px 0 2px;color:var(--dark)}.kpi-v .num{font-size:34px}
+.kpi-s{font-size:13px;color:var(--mid)}
+section{background:#fff;border-radius:var(--r-lg);padding:22px 24px;margin:20px 0;box-shadow:var(--sombra)}
+section h2{font-size:24px;margin:0 0 4px}
+section .nota{margin:0 0 16px;font-size:14px;color:var(--mid)}
+.chip{display:inline-block;padding:3px 12px;border-radius:9999px;font-weight:700;font-size:13px;white-space:nowrap}
+#mapa{height:540px;border-radius:var(--r-md);border:1px solid var(--light)}
+.tabs{margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap}
+.tab{border:1px solid var(--light);background:#fff;color:var(--dark);padding:7px 16px;border-radius:9999px;cursor:pointer;font:600 14px var(--body)}
+.tab:hover{border-color:var(--cyan);background:var(--cyan-x)}
+.tab.on{background:var(--dark);color:#fff;border-color:var(--dark)}
+.tab:focus-visible,summary:focus-visible{outline:3px solid var(--cyan);outline-offset:2px}
+table{border-collapse:separate;border-spacing:0;width:100%}
+th{background:var(--cyan-x);color:var(--dark);font-weight:700;font-size:14px;padding:10px;text-align:center}
+th:first-child{border-radius:var(--r-sm) 0 0 var(--r-sm)}th:last-child{border-radius:0 var(--r-sm) var(--r-sm) 0}
 th:first-child,td:first-child{text-align:left}
-td{border-bottom:1px solid var(--linea);padding:9px 10px;text-align:center}
-td .sub{font-size:12px;color:var(--gris);margin-top:2px}td.vacio{color:var(--gris)}
-.barras .fila{display:flex;align-items:center;gap:12px;margin:7px 0}.barras .et{width:70px;font-size:13px;color:var(--gris)}
-.barra{flex:1;display:flex;height:22px;border-radius:5px;overflow:hidden;background:#e4e7eb}.barra span{display:block;height:100%}
-.leyenda{display:flex;flex-wrap:wrap;gap:6px 18px;margin-top:12px;font-size:13px}
-.ley i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:6px;vertical-align:-1px}.ley small{color:var(--gris)}
-details{margin-top:8px}summary{cursor:pointer;font-weight:600;color:var(--azul2)}
-details ul{margin:10px 0 0;padding-left:20px;font-size:14px}details li{margin:4px 0}
-footer{color:var(--gris);font-size:12px;padding:6px 0 30px}
-@media(max-width:640px){.cab h1{font-size:21px}.cab .fecha{margin-left:0;text-align:left}#mapa{height:420px}}
-@media print{header{background:#fff;color:#000;border-bottom:2px solid #000}.tabs{display:none}#mapa{height:360px}section{break-inside:avoid}}
+td{border-bottom:1px solid #e6e8ea;padding:10px;text-align:center}
+td .sub{font-size:12px;color:var(--mid);margin-top:2px}td.vacio{color:var(--mid)}
+.barras .fila{display:flex;align-items:center;gap:12px;margin:8px 0}.barras .et{width:70px;font-size:14px;color:var(--mid)}
+.barra{flex:1;display:flex;height:24px;border-radius:9999px;overflow:hidden;background:#e9ecee}.barra span{display:block;height:100%}
+.leyenda{display:flex;flex-wrap:wrap;gap:6px 18px;margin-top:14px;font-size:13px}
+.ley i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:6px;vertical-align:-1px}.ley small{color:var(--mid)}
+details{margin-top:8px}summary{cursor:pointer;font-weight:700;color:var(--cyan);color:#0086b3}
+details ul{margin:12px 0 0;padding-left:20px;font-size:15px}details li{margin:6px 0}
+footer{display:flex;align-items:center;gap:12px;color:var(--mid);font-size:13px;padding:6px 0 34px}
+footer img{height:34px;width:auto}
+@media(max-width:640px){.cab h1{font-size:22px}.cab img{height:50px}.cab .fecha{margin-left:0;text-align:left}#mapa{height:420px}}
+@media print{header{background:#fff;color:#000}.cab h1,.cab p,.cab .fecha{color:#000}.cab img{filter:invert(1)}.tabs{display:none}#mapa{height:360px}section{break-inside:avoid;box-shadow:none;border:1px solid var(--light)}}
 """
 
 
@@ -156,7 +167,7 @@ def html(ilpi_hoy, historial, actualizado, mapa=None, logo=False):
             fig.add_trace(go.Scatter(x=g["Emision"], y=g["Score"], mode="lines+markers", name=pto))
         fig.update_layout(height=360, template="plotly_white", yaxis_title="Índice (0-100)",
                           margin=dict(l=50, r=20, t=20, b=40), legend=dict(orientation="h", y=-0.2),
-                          colorway=["#0b3a5b", "#00a3a1", "#f08c00", "#7b1fa2", "#e03131"])
+                          colorway=["#00ABE5", "#5BBDB5", "#7AB929", "#414042", "#7F7F7F"], font=dict(family="Nunito, sans-serif", color="#414042"))
         graf = fig.to_html(full_html=False, include_plotlyjs="cdn")
     kpis = _kpis(ilpi_hoy, mapa)
     sec_kpis = f"<div class='kpis'>{kpis}</div>" if kpis else ""
@@ -165,7 +176,7 @@ def html(ilpi_hoy, historial, actualizado, mapa=None, logo=False):
     sec_barras = (f"<section><h2>Superficie con combustible por clase de peligro</h2>"
                   f"<p class='nota'>Proporción de la superficie con combustible en cada clase, por día.</p>{_barras(mapa)}</section>") if mapa else ""
     sec_graf = f"<section><h2>Historial</h2><p class='nota'>Índice del día en cada punto (emisión diaria, ECMWF).</p>{graf}</section>" if graf else ""
-    logo_html = "<img src='logo.png' alt='Tinguiririca Energía'>" if logo else ""
+    logo_html = "<img src='img/logo-white.png' alt='Tinguiririca Energía'>" if logo else ""
     return f"""<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1"><title>Peligro de incendios forestales · Cuenca del Tinguiririca</title>
 <style>{CSS}</style></head><body>
@@ -188,7 +199,7 @@ No es un pronóstico oficial ni predice la ocurrencia de incendios. Referencia o
 <li><b>Clases (provisorias):</b> Bajo &lt; 30 · Moderado 30–50 · Alto 50–65 · Muy alto 65–80 · Extremo ≥ 80.</li>
 <li><b>Limitaciones:</b> sin nieve ni humedad de la vegetación viva (NDMI); la cobertura no distingue bosque nativo de plantación; el viento no incorpora el relieve; el mapa cubre solo la cuenca alta y media.</li>
 </ul></details></section>
-<footer>Botón Rojo TE · uso interno y experimental. Mapa base © OpenStreetMap.</footer>
+<footer><img src="img/iso-color.png" alt=""><span>Botón Rojo TE · uso interno y experimental. Mapa base © OpenStreetMap.</span></footer>
 </div></body></html>"""
 
 
