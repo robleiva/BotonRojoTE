@@ -95,6 +95,16 @@ def _barras(mapa):
 
 
 # ------------------------------------------------------------------ mapa
+def _limite_cuenca():
+    """Poligonos [[lat, lon], ...] del contorno de la cuenca; lista vacia si el archivo no existe."""
+    from .config import F_LIMITE
+    try:
+        with open(F_LIMITE, encoding="utf-8") as f:
+            return json.load(f)["poligonos"]
+    except (OSError, ValueError, KeyError):
+        return []
+
+
 def _mapa_html(mapa, ilpi_hoy):
     """Mapa Leaflet con una capa PNG por dia, marcadores de los puntos y leyenda."""
     from . import grilla
@@ -105,7 +115,7 @@ def _mapa_html(mapa, ilpi_hoy):
         g = ilpi_hoy[(ilpi_hoy["Punto"] == n) & (ilpi_hoy["Modelo"] == "ECMWF")].sort_values("Fecha_Valida")
         pts.append({"n": n, "lat": m["lat"], "lon": m["lon"], "s": [f"{x:.0f}" for x in g["Score"]], "c": list(g["Clase"])})
     ign = grilla.png_ignicion_base64(mapa["ignicion"]) if mapa.get("ignicion") is not None else None
-    datos = json.dumps({"lim": mapa["limites"], "dias": dias, "pts": pts, "color": COLOR, "ign": ign}, ensure_ascii=False)
+    datos = json.dumps({"lim": mapa["limites"], "dias": dias, "pts": pts, "color": COLOR, "ign": ign, "cuenca": _limite_cuenca()}, ensure_ascii=False)
     return MAPA_TPL.replace("__DATOS__", datos)
 
 
@@ -115,6 +125,8 @@ MAPA_TPL = """<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/
 <script>(function(){var D=__DATOS__;var m=L.map("mapa",{scrollWheelZoom:false});
 L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:17,attribution:"&copy; OpenStreetMap"}).addTo(m);
 m.fitBounds(D.lim);var capa=null,btns=[];
+m.createPane("cuenca");m.getPane("cuenca").style.zIndex=450;m.getPane("cuenca").style.pointerEvents="none";
+D.cuenca.forEach(function(r){L.polygon(r,{pane:"cuenca",color:"#414042",weight:2.5,dashArray:"7 5",fill:false,interactive:false}).addTo(m);});
 function ver(i){if(capa)m.removeLayer(capa);capa=L.imageOverlay("data:image/png;base64,"+D.dias[i].png,D.lim,{opacity:0.85,interactive:false}).addTo(m);
 btns.forEach(function(b,j){b.className=j==i?"tab on":"tab"});document.getElementById("leyign").style.display="none";}
 function verIgn(){if(capa)m.removeLayer(capa);capa=L.imageOverlay("data:image/png;base64,"+D.ign,D.lim,{opacity:0.85,interactive:false}).addTo(m);
@@ -123,7 +135,9 @@ D.dias.forEach(function(d,i){var b=document.createElement("button");b.textConten
 D.pts.forEach(function(p){var c=D.color[p.c[0]]||"#555";L.circleMarker([p.lat,p.lon],{radius:8,color:"#414042",weight:2,fillColor:c,fillOpacity:1}).addTo(m).bindTooltip("<b>"+p.n+"</b><br>"+p.c.map(function(x,k){return x+" "+p.s[k]}).join("<br>"));});
 if(D.ign){var bi=document.createElement("button");bi.textContent="Ignición humana";bi.className="tab";bi.onclick=verIgn;document.getElementById("dias").appendChild(bi);btns.push(bi);}
 ver(0);})();</script>
-<p id="leyign" class="nota" style="display:none;margin-top:10px">Cercanía a caminos, edificaciones y líneas de transmisión (OpenStreetMap). Cian claro: poca exposición; gris oscuro: mucha. Es una capa aparte: no entra en el índice de peligro y no está calibrada.</p>"""
+<div id="leyign" class="nota" style="display:none;margin-top:10px"><p><b>Ignición humana:</b> muestra qué zonas están más expuestas a que un fuego se <i>inicie</i> por actividad de las personas (chispas de vehículos, faenas, cigarrillos, fogatas, fallas de líneas eléctricas). Se calcula con la cercanía a caminos, edificaciones y líneas de transmisión, según OpenStreetMap.</p>
+<p><span style="display:inline-block;width:150px;height:10px;border-radius:5px;vertical-align:middle;background:linear-gradient(90deg,rgba(0,171,229,.45),#414042)"></span> De poca exposición (cian claro) a mucha exposición (gris oscuro).</p>
+<p>Es una capa aparte: <b>no entra en el índice de peligro</b> y no está calibrada. El índice dice qué tan fácil sería que un fuego se propague; esta capa dice dónde es más probable que parta. Lo más delicado es la combinación de ambos: peligro alto en una zona con alta exposición.</p></div>"""
 
 _EXPL_CLASES = {"Bajo": "Combustible húmedo o con pocas posibilidades de propagación. Condiciones poco favorables para un fuego.",
     "Moderado": "Combustible algo seco. Un fuego puede iniciarse y avanzar con dificultad; precaución con faenas que usen fuego o chispas.",
@@ -206,6 +220,49 @@ footer img{height:34px;width:auto}
 """
 
 
+def _historial(historial):
+    """Una casilla por punto y por dia: color = clase vigente, numero = puntaje. Gris = sin dato."""
+    if historial is None or historial.empty:
+        return ""
+    import pandas as pd
+    import plotly.graph_objects as go
+    from . import fireindex as fi
+    h = historial[(historial["Lead"] == 0) & (historial["Modelo"] == "ECMWF") & (historial["Punto"].isin(list(PUNTOS)))].copy()
+    if h.empty:
+        return ""
+    h["Dia"] = pd.to_datetime(h["Emision"]).dt.normalize()
+    h = h.sort_values("Emision").drop_duplicates(["Punto", "Dia"], keep="last")
+    h = h[h["Dia"] >= h["Dia"].max() - pd.Timedelta(days=44)]
+    dias = pd.date_range(h["Dia"].min(), h["Dia"].max())
+    puntos = list(PUNTOS)
+    idx = {c: i for i, c in enumerate(CLASES)}
+    z, txt, hov = [], [], []
+    for pto in puntos:
+        g = h[h["Punto"] == pto].set_index("Dia")["Score"]
+        fz, ft, fh = [], [], []
+        for d in dias:
+            if d in g.index:
+                sc = float(g[d])
+                c = str(fi.to_class(sc, fi.PROV_BREAKS))      # clase con los cortes vigentes, no los de la fecha de emision
+                fz.append(idx[c]); ft.append(f"{sc:.0f}")
+                fh.append(f"{pto}<br>{_dia(d)}: {c} ({sc:.0f})" + ("<br>combustible húmedo" if sc < 1 else ""))
+            else:
+                fz.append(None); ft.append(""); fh.append(f"{pto}<br>{_dia(d)}: sin dato")
+        z.append(fz); txt.append(ft); hov.append(fh)
+    n = len(CLASES)
+    escala = []
+    for i, c in enumerate(CLASES):
+        escala += [[i / n, COLOR[c]], [(i + 1) / n, COLOR[c]]]
+    fig = go.Figure(go.Heatmap(z=z, x=[d.strftime("%d-%m") for d in dias], y=puntos, text=txt, texttemplate="%{text}",
+                               hovertext=hov, hoverinfo="text", colorscale=escala, zmin=-0.5, zmax=n - 0.5, showscale=False,
+                               xgap=3, ygap=3, textfont=dict(size=11, color="#414042")))
+    fig.update_yaxes(autorange="reversed", showgrid=False)
+    fig.update_xaxes(showgrid=False, tickangle=-60, type="category")
+    fig.update_layout(height=60 + 46 * len(puntos), template="plotly_white", margin=dict(l=110, r=10, t=10, b=60),
+                      plot_bgcolor="#EEF1F3", font=dict(family="Nunito, sans-serif", color="#414042"))
+    return fig.to_html(full_html=False, include_plotlyjs="cdn", config={"displayModeBar": False})
+
+
 def html(ilpi_hoy, historial, actualizado, mapa=None, logo=False):
     fechas = sorted(ilpi_hoy["Fecha_Valida"].unique()) if not ilpi_hoy.empty else []
     filas = ""
@@ -213,18 +270,7 @@ def html(ilpi_hoy, historial, actualizado, mapa=None, logo=False):
         celdas = "".join(_celda(ilpi_hoy[(ilpi_hoy["Punto"] == pto) & (ilpi_hoy["Fecha_Valida"] == f)]) for f in fechas)
         filas += f"<tr><td><b>{pto}</b></td>{celdas}</tr>"
     cab = "".join(f"<th>{_dia(f)}</th>" for f in fechas)
-    graf = ""
-    if historial is not None and not historial.empty:
-        import plotly.graph_objects as go
-        h = historial[(historial["Lead"] == 0) & (historial["Modelo"] == "ECMWF") & (historial["Punto"].isin(list(PUNTOS)))]
-        fig = go.Figure()
-        for pto, g in h.groupby("Punto"):
-            g = g.sort_values("Emision")
-            fig.add_trace(go.Scatter(x=g["Emision"], y=g["Score"], mode="lines+markers", name=pto))
-        fig.update_layout(height=360, template="plotly_white", yaxis_title="Índice (0-100)",
-                          margin=dict(l=50, r=20, t=20, b=40), legend=dict(orientation="h", y=-0.2),
-                          colorway=["#00ABE5", "#5BBDB5", "#7AB929", "#414042", "#7F7F7F"], font=dict(family="Nunito, sans-serif", color="#414042"))
-        graf = fig.to_html(full_html=False, include_plotlyjs="cdn")
+    graf = _historial(historial)
     expl = _explicacion()
     aviso_clases = ("las clases se definen por percentiles del clima histórico de la cuenca, no con incendios reales."
                     if _calibrado() else "las clases son provisorias, aún sin calibrar con incendios reales.")
@@ -234,7 +280,7 @@ def html(ilpi_hoy, historial, actualizado, mapa=None, logo=False):
                 f"{_mapa_html(mapa, ilpi_hoy)}</section>") if mapa else ""
     sec_barras = (f"<section><h2>Superficie con combustible por clase de peligro</h2>"
                   f"<p class='nota'>Proporción de la superficie con combustible en cada clase, por día.</p>{_barras(mapa)}</section>") if mapa else ""
-    sec_graf = f"<section><h2>Historial</h2><p class='nota'>Índice del día en cada punto (emisión diaria, ECMWF).</p>{graf}</section>" if graf else ""
+    sec_graf = f"<section><h2>Historial</h2><p class='nota'>Cada casilla es un día en un punto: el color es la clase de peligro y el número, el puntaje (0 = combustible húmedo tras lluvia). Gris: sin dato. Las clases se muestran con los cortes vigentes, también para días anteriores.</p>{graf}<div class='leyenda'>{''.join(f"<span class='ley'><i style='background:{COLOR[c]}'></i>{c}</span>" for c in CLASES)}</div></section>" if graf else ""
     logo_html = "<img src='img/logo-white.png' alt='Tinguiririca Energía'>" if logo else ""
     return f"""<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1"><title>Peligro de incendios forestales · Cuenca del Tinguiririca</title>
