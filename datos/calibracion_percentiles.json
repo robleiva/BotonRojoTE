@@ -1,0 +1,59 @@
+{
+ "cortes": [
+  57.7,
+  65.3,
+  72.8,
+  76.3
+ ],
+ "percentiles": [
+  50,
+  75,
+  90,
+  97
+ ],
+ "periodo": "2000-07-01 a 2026-11-17",
+ "dias_temporada": 27830,
+ "meses_temporada": [
+  10,
+  11,
+  12,
+  1,
+  2,
+  3,
+  4
+ ],
+ "generado": "2026-11-27",
+ "fuente": "Open-Meteo archive (ERA5-Land / ERA5)",
+ "por_punto": {
+  "Termas del Flaco": [
+   60.7,
+   72.2,
+   76.1,
+   78.9
+  ],
+  "BT Tinguiririca": [
+   61.2,
+   68.9,
+   72.1,
+   75.0
+  ],
+  "BT Portillo": [
+   61.4,
+   71.5,
+   74.8,
+   77.1
+  ],
+  "HLC": [
+   54.2,
+   59.3,
+   61.8,
+   64.1
+  ],
+  "HLH": [
+   57.6,
+   61.0,
+   62.9,
+   64.0
+  ]
+ }
+}
