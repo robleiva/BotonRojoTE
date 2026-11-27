@@ -51,7 +51,12 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add historico/ docs/
           git diff --staged --quiet || git commit -m "Auto: ILPI $(date -u +%F) [skip ci]"
-          git push
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rechazado (intento $i): integrando cambios nuevos del repositorio"
+            git pull --rebase -X theirs origin main
+          done
+          exit 1
 
   publicar:
     # Solo si defines la variable del repositorio PUBLICAR_PAGES = true (y tu plan permite Pages)
