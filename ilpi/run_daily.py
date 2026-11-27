@@ -183,13 +183,14 @@ def main():
         print(f"[mapa] {len(mapa['fechas'])} dias, {mapa['resumen'][0]['Ha_combustible']} ha con combustible")
     except Exception as e:                      # el mapa nunca debe impedir la emision por punto
         print(f"[mapa] omitido: {e}")
-    with open(os.path.join(DOCS, "index.html"), "w", encoding="utf-8") as f:
-        f.write(reporte.html(hoy_df, hist, stamp, mapa, avisos=avisos_est, tormenta=tormenta, logo=os.path.exists(os.path.join(DOCS, "img", "logo-white.png"))))
-    with open(os.path.join(DOCS, "ilpi_ultimo.json"), "w", encoding="utf-8") as f:
-        f.write(reporte.json_salida(hoy_df, stamp))
+    # estado oficial de Boton Rojo (CONAF): se usa en la pagina y en el correo
     fechas_br = sorted(hoy_df[hoy_df["Modelo"] == "ECMWF"]["Fecha_Valida"].unique())
     br = br_conaf.consultar(COMUNAS_BR, [pd.Timestamp(f).strftime("%Y-%m-%d") for f in fechas_br])
     print("[botón rojo]", "no disponible" if br is None else {f: {c: (None if v is None else v["activo"]) for c, v in d.items()} for f, d in br.items()})
+    with open(os.path.join(DOCS, "index.html"), "w", encoding="utf-8") as f:
+        f.write(reporte.html(hoy_df, hist, stamp, mapa, avisos=avisos_est, tormenta=tormenta, br=br, logo=os.path.exists(os.path.join(DOCS, "img", "logo-white.png"))))
+    with open(os.path.join(DOCS, "ilpi_ultimo.json"), "w", encoding="utf-8") as f:
+        f.write(reporte.json_salida(hoy_df, stamp))
     print("[correo]", alerta.enviar_si_corresponde(hoy_df, stamp, tormenta=tormenta, br=br))
     print("[feed]", alerta.actualizar_feed(hoy_df, stamp, os.path.join(DOCS, "alertas.xml"), hoy, tormenta=tormenta, br=br))
     print(hoy_df[hoy_df["Modelo"] == "ECMWF"].pivot(index="Punto", columns="Fecha_Valida", values="Clase").to_string())

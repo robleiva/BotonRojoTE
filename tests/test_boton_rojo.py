@@ -61,3 +61,22 @@ def test_modo_alerta_se_dispara_por_boton_rojo_aunque_el_indice_sea_bajo():
     br = b.resumir(FILAS, ["Chimbarongo"], ["2026-11-27", "2026-11-28"])
     assert alerta.debe_enviar(_df(), "alerta", None, br) is True
     assert alerta.debe_enviar(_df(), "alerta", None, None) is False
+
+
+def test_pagina_muestra_boton_rojo_por_comuna():
+    from ilpi import reporte
+    fechas = list(pd.to_datetime(["2026-11-27", "2026-11-28", "2026-12-05"]))
+    br = b.resumir(FILAS, ["San Fernando", "Chimbarongo"], ["2026-11-27", "2026-11-28", "2026-12-05"])
+    h = reporte._boton_rojo(br, fechas)
+    assert "Botón Rojo oficial de CONAF" in h and "San Fernando" in h and "Chimbarongo" in h
+    assert "2 de 5 h" in h and "35 % de la comuna" in h and "Sin Botón Rojo" in h and "sin dato" in h
+    assert "C92A2A" in h and "🔴" in h
+
+
+def test_pagina_sin_boton_rojo_activo_y_con_consulta_fallida():
+    from ilpi import reporte
+    fechas = list(pd.to_datetime(["2026-11-27"]))
+    h = reporte._boton_rojo(b.resumir(FILAS[:1], ["San Fernando"], ["2026-11-27"]), fechas)
+    assert "🔴" not in h and "Sin Botón Rojo" in h
+    assert "No se pudo consultar" in reporte._boton_rojo(None, fechas)
+    assert reporte._boton_rojo(False, fechas) == ""

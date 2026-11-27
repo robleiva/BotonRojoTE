@@ -294,7 +294,41 @@ def _tormenta(tormenta):
             f"<div class='tors'>{chips}</div></section>")
 
 
-def html(ilpi_hoy, historial, actualizado, mapa=None, logo=False, avisos=None, tormenta=None):
+def _boton_rojo(br, fechas):
+    """Estado oficial de Boton Rojo (CONAF) por comuna y dia. br: salida de boton_rojo.resumir, None (consulta fallida) o False (no se usa)."""
+    if br is False:
+        return ""
+    if br is None:
+        return ("<section><h2>Botón Rojo oficial de CONAF</h2><p class='nota'>No se pudo consultar la capa de CONAF en esta actualización. "
+                "Revisar en conaf.cl (Incendios Forestales, Botón Rojo).</p></section>")
+    comunas = sorted({c for d in br.values() for c in d})
+    if not comunas:
+        return ""
+    activo = False
+    cab = "".join(f"<th>{_dia(f)}</th>" for f in fechas)
+    filas = ""
+    for c in comunas:
+        celdas = ""
+        for f in fechas:
+            v = br.get(pd.Timestamp(f).strftime("%Y-%m-%d"), {}).get(c, None)
+            if v is None:
+                celdas += "<td><span class='chip' style='background:#E5E8EA;color:#7F7F7F'>sin dato</span></td>"
+            elif v["activo"]:
+                activo = True
+                celdas += (f"<td><span class='chip' style='background:#C92A2A;color:#fff'>Botón Rojo</span>"
+                           f"<div class='nota' style='margin:2px 0 0'>{v['horas']} de 5 h · {v['prop'] * 100:.0f} % de la comuna</div></td>")
+            else:
+                celdas += "<td><span class='chip' style='background:#E5E8EA;color:#2F9E44'>Sin Botón Rojo</span></td>"
+        filas += f"<tr><td><b>{c}</b></td>{celdas}</tr>"
+    clase = " class='torm' style='border-left-color:#C92A2A'" if activo else ""
+    pre = "🔴 " if activo else ""
+    return (f"<section{clase}><h2>{pre}Botón Rojo oficial de CONAF</h2>"
+            "<p class='nota'>Se declara cuando la probabilidad de ignición es de 70 % o más y el viento de 20 km/h o más entre las 14:00 y las 18:59. "
+            "Es la condición oficial de CONAF y es independiente de las clases de este índice. Aparece \"sin dato\" cuando CONAF aún no publica ese día.</p>"
+            f"<table><tr><th>Comuna</th>{cab}</tr>{filas}</table></section>")
+
+
+def html(ilpi_hoy, historial, actualizado, mapa=None, logo=False, avisos=None, tormenta=None, br=False):
     fechas = sorted(ilpi_hoy["Fecha_Valida"].unique()) if not ilpi_hoy.empty else []
     filas = ""
     for pto in ilpi_hoy["Punto"].unique() if not ilpi_hoy.empty else []:
@@ -309,6 +343,7 @@ def html(ilpi_hoy, historial, actualizado, mapa=None, logo=False, avisos=None, t
     sec_kpis = f"<div class='kpis'>{kpis}</div>" if kpis else ""
     sec_avisos = "".join(f"<div class='aviso-est'>⚠ {a}</div>" for a in (avisos or []))
     sec_tor = _tormenta(tormenta)
+    sec_br = _boton_rojo(br, fechas)
     sec_mapa = (f"<section><h2>Mapa de peligro</h2><p class='nota'>Celdas de 90 m. Se pinta solo donde hay combustible relevante; roca, nieve y agua quedan sin color.</p>"
                 f"{_mapa_html(mapa, ilpi_hoy)}</section>") if mapa else ""
     sec_barras = (f"<section><h2>Superficie con combustible por clase de peligro</h2>"
@@ -326,6 +361,7 @@ def html(ilpi_hoy, historial, actualizado, mapa=None, logo=False, avisos=None, t
 No es un pronóstico oficial ni predice la ocurrencia de incendios. Referencia oficial: CONAF y SENAPRED.</div>
 {sec_avisos}
 {sec_kpis}
+{sec_br}
 {sec_tor}
 {sec_mapa}
 <section><h2>Peligro por punto de monitoreo</h2>
