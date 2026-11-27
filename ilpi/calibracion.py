@@ -31,7 +31,7 @@ def parsear(j):
     return d, j.get("elevation", np.nan)
 
 
-def descargar_punto(lat, lon, ini, fin, anios_por_llamada=3, espera=30, dormir=time.sleep):
+def descargar_punto(lat, lon, ini, fin, anios_por_llamada=1, espera=20, dormir=time.sleep):
     """Serie horaria [ini, fin] en tramos; reintenta ante HTTP 429. Devuelve (DataFrame, elevacion del modelo)."""
     trozos, elev = [], np.nan
     a = ini
@@ -39,18 +39,22 @@ def descargar_punto(lat, lon, ini, fin, anios_por_llamada=3, espera=30, dormir=t
         b = min(dt.date(a.year + anios_por_llamada - 1, 12, 31), fin)
         params = {"latitude": lat, "longitude": lon, "start_date": a.isoformat(), "end_date": b.isoformat(),
                   "hourly": ",".join(VARS.values()), "timezone": ZONA, "wind_speed_unit": "kmh"}
-        for intento in range(6):
-            r = requests.get(URL, params=params, headers=CABECERAS, timeout=120)
-            if r.status_code == 200:
-                d, elev = parsear(r.json())
-                trozos.append(d)
-                break
-            print(f"[calibracion] HTTP {r.status_code} en {a}..{b} (intento {intento + 1}/6)", flush=True)
+        for intento in range(8):
+            try:
+                r = requests.get(URL, params=params, headers=CABECERAS, timeout=(20, 240))
+                if r.status_code == 200:
+                    d, elev = parsear(r.json())
+                    trozos.append(d)
+                    break
+                motivo = f"HTTP {r.status_code}"
+            except requests.exceptions.RequestException as e:     # tiempo agotado, conexion cortada, etc.
+                motivo = type(e).__name__
+            print(f"[calibracion] {motivo} en {a}..{b} (intento {intento + 1}/8)", flush=True)
             dormir(espera * (intento + 1))
         else:
-            raise RuntimeError(f"Open-Meteo no respondio para {a}..{b}")
+            raise RuntimeError(f"Open-Meteo no respondio para {a}..{b} ({motivo})")
         a = b + dt.timedelta(days=1)
-        dormir(2)
+        dormir(3)
     return pd.concat(trozos, ignore_index=True), elev
 
 

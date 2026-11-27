@@ -44,11 +44,13 @@ def test_descargar_reintenta_429(monkeypatch):
 
     def get(url, params=None, headers=None, timeout=None):
         llamadas.append(params["start_date"])
-        return R(429 if len(llamadas) == 1 else 200)
+        if len(llamadas) == 1:
+            raise calibracion.requests.exceptions.ReadTimeout()
+        return R(429 if len(llamadas) == 2 else 200)
 
     monkeypatch.setattr(calibracion.requests, "get", get)
     d, z = calibracion.descargar_punto(-34.9, -70.5, dt.date(2000, 7, 1), dt.date(2001, 12, 31), dormir=lambda s: None)
-    assert z == 1234 and len(d) == 1 and len(llamadas) == 2
+    assert z == 1234 and len(d) == 2 and len(llamadas) == 4      # 1 timeout + 1 HTTP 429 + 2 tramos anuales
 
 
 def test_pagina_muestra_clases_calibradas(monkeypatch):
