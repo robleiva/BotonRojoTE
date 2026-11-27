@@ -51,6 +51,11 @@ def main():
         obs = _upsert(pd.concat(nuevas), obs, ["Punto", "Fecha_Local"])
         obs.to_csv(F_OBS, index=False)
     print(f"[estaciones] {0 if obs.empty else len(obs)} registros horarios en historico")
+    for pto in ESTACIONES:                       # aviso si una estacion lleva dias sin reportar
+        o = obs[obs["Punto"] == pto] if not obs.empty else obs
+        if o.empty or (hoy - o["Fecha_Local"].max().normalize()).days >= 2:
+            ult = "nunca" if o.empty else f"{o['Fecha_Local'].max():%Y-%m-%d %H:%M}"
+            print(f"[estaciones] ATENCION: {pto} sin datos recientes (ultimo registro: {ult}); el indice de ese punto usa el modelo")
 
     # 2. Modelos (Open-Meteo): 15 h registrado (pasado) y pronostico
     reg_modelo, pron = [], []

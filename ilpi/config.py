@@ -19,6 +19,10 @@ PUNTOS = {
 # Estaciones Ambient Weather: punto -> nombre de la variable de entorno con la MAC
 ESTACIONES = {"BT Portillo": "MAC_PORTILLO", "BT Tinguiririca": "MAC_TINGUIRIRICA"}
 
+# Altura del anemometro de cada estacion (m). Los modelos entregan viento a 10 m: se convierte para compararlos.
+ALTURA_ANEMOMETRO = {"BT Tinguiririca": 2.0}
+ALTURA_ANEMOMETRO_DEFECTO = 10.0
+
 # Rutas
 BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 HIST = os.path.join(BASE, "historico")
