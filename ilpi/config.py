@@ -40,3 +40,6 @@ F_GRILLA = os.path.join(DATOS, "terreno_90m.npz")         # DEM, pendiente, expo
 F_LIMITE = os.path.join(DATOS, "limite_cuenca.json")     # contorno de la cuenca para el mapa
 F_IGNICION = os.path.join(DATOS, "ignicion_90m.npz")      # exposicion a ignicion humana (OSM), opcional
 F_TERRENO = os.path.join(DATOS, "puntos_terreno.csv")   # pendiente, exposicion, combustible, NDMI
+
+# Comunas para las que el correo informa el estado oficial de Boton Rojo (CONAF).
+COMUNAS_BR = ["San Fernando", "Chimbarongo"]

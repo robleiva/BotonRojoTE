@@ -47,13 +47,43 @@ def _texto_tormenta(tormenta):
     return "Tormenta eléctrica " + ", ".join(dias) if dias else ""
 
 
-def debe_enviar(ilpi_hoy, modo="diario", tormenta=None):
+def debe_enviar(ilpi_hoy, modo="diario", tormenta=None, br=None):
     if modo != "alerta":
         return True
+    from . import boton_rojo
+    if boton_rojo.hay_boton_rojo(br):
+        return True      # Boton Rojo oficial de CONAF en las comunas de interes
     c = clase_maxima(ilpi_hoy)
     if c is not None and ORDEN.index(c) >= ORDEN.index("Alto"):
         return True
     return False   # la tormenta electrica solo se informa en la pagina, no dispara ni aparece en el correo
+
+
+def _bloque_br(br, fechas, comunas_txt=""):
+    """Estado oficial de Boton Rojo (CONAF) para las comunas configuradas; texto de respaldo si no hay dato."""
+    gris, base = "#7F7F7F", "font-size:12px;margin:12px 0 0;color:#5b6b76"
+    if br is None:
+        return (f"<p style='{base}'><b style='font-weight:600'>Botón Rojo CONAF:</b> no se pudo consultar hoy; "
+                f"revisar en conaf.cl (Incendios Forestales, Botón Rojo).</p>")
+    comunas = sorted({c for d in br.values() for c in d})
+    if not comunas:
+        return ""
+    cab = "".join(f"<th style='font-weight:400;color:#5b6b76;padding:4px 10px;background:#E5F5FD'>{DIAS[f.weekday()]} {f:%d-%m}</th>" for f in fechas)
+    filas = ""
+    for c in comunas:
+        celdas = ""
+        for f in fechas:
+            v = br.get(f"{f:%Y-%m-%d}", {}).get(c, "x")
+            if v == "x" or v is None:
+                celdas += f"<td style='text-align:center;padding:4px 10px;color:{gris}'>sin dato</td>"
+            elif v["activo"]:
+                celdas += (f"<td style='text-align:center;padding:4px 10px'><span style='background:#c92a2a;color:#fff;border-radius:10px;"
+                           f"padding:2px 9px;font-size:12px'>Botón Rojo</span> <span style='font-size:11px;color:{gris}'>{v['horas']} de 5 h</span></td>")
+            else:
+                celdas += f"<td style='text-align:center;padding:4px 10px;color:#2f9e44'>Sin Botón Rojo</td>"
+        filas += f"<tr><td style='padding:4px 10px'>{_h.escape(c)}</td>{celdas}</tr>"
+    return (f"<p style='{base}'><b style='font-weight:600'>Botón Rojo oficial de CONAF</b> (probabilidad de ignición ≥ 70 % y viento ≥ 20 km/h entre las 14:00 y las 18:59):</p>"
+            f"<table style='border-collapse:collapse;width:100%;font-size:13px'><tr><th style='text-align:left;font-weight:400;color:#5b6b76;padding:4px 10px;background:#E5F5FD'>Comuna</th>{cab}</tr>{filas}</table>")
 
 
 def turno_del_dia(ahora):
@@ -62,7 +92,7 @@ def turno_del_dia(ahora):
     return "manana" if ahora.astimezone(ZoneInfo("America/Santiago")).hour < 12 else "tarde"
 
 
-def construir(ilpi_hoy, actualizado, url="", tormenta=None, turno=""):
+def construir(ilpi_hoy, actualizado, url="", tormenta=None, turno="", br=False):
     e, fechas = _tabla(ilpi_hoy)
     c = clase_maxima(ilpi_hoy) or "sin datos"
     cab = "".join(f"<th style='font-weight:400;color:#5b6b76;padding:6px 10px;background:#E5F5FD'>{DIAS[f.weekday()]} {f:%d-%m}</th>" for f in fechas)
@@ -79,6 +109,7 @@ def construir(ilpi_hoy, actualizado, url="", tormenta=None, turno=""):
                            f"border-radius:10px;padding:2px 9px;font-size:12px'>{r['Clase']}</span> {r['Score']:.0f}</td>")
         filas += f"<tr><td style='padding:6px 10px'>{_h.escape(str(pto))}</td>{celdas}</tr>"
     # La tormenta electrica (aproximacion por inestabilidad) se muestra solo en la pagina; en el correo puede llevar a confusion.
+    bloque_br = "" if br is False else _bloque_br(br, fechas)
     enlace = f"<p style='margin:14px 0 0'><a href='{url}'>Ver el mapa y el detalle</a></p>" if url else ""
     cortes = _cortes()
     rangos = [f"menos de {cortes[0]}", f"{cortes[0]} a {cortes[1]}", f"{cortes[1]} a {cortes[2]}", f"{cortes[2]} a {cortes[3]}", f"{cortes[3]} o más"]
@@ -92,10 +123,12 @@ def construir(ilpi_hoy, actualizado, url="", tormenta=None, turno=""):
               f"<h2 style='color:#00ABE5;font-weight:400;margin:0 0 4px'>Peligro de incendios forestales: máximo {c}</h2>"
               f"<p style='margin:0 0 12px;color:#7F7F7F;font-size:13px'>Cuenca del río Tinguiririca. Actualizado {actualizado}.</p>"
               f"<table style='border-collapse:collapse;width:100%;font-size:14px'><tr><th style='text-align:left;font-weight:400;color:#5b6b76;padding:6px 10px;background:#E5F5FD'>Punto</th>{cab}</tr>{filas}</table>"
-              f"{bloque_l}{enlace}"
+              f"{bloque_br}{bloque_l}{enlace}"
               f"<p style='font-size:11px;color:#7F7F7F;margin:14px 0 0'>Experimental: índice relativo, aún sin calibrar con incendios reales. "
               f"No es un pronóstico oficial; la referencia oficial es CONAF y SENAPRED.</p></div>")
-    return f"Peligro de incendios Tinguiririca: {c}", cuerpo
+    from . import boton_rojo
+    asunto = f"Peligro de incendios Tinguiririca: {c}" + (" · Botón Rojo CONAF" if boton_rojo.hay_boton_rojo(br or None) else "")
+    return asunto, cuerpo
 
 
 def url_pagina(env=os.environ):
@@ -116,18 +149,18 @@ def _leer_items(ruta):
     return out
 
 
-def actualizar_feed(ilpi_hoy, actualizado, ruta, hoy, env=os.environ, tormenta=None, ahora=None, max_items=10):
+def actualizar_feed(ilpi_hoy, actualizado, ruta, hoy, env=os.environ, tormenta=None, ahora=None, max_items=10, br=False):
     """Agrega al archivo RSS (docs/alertas.xml) el aviso del dia si corresponde segun EMAIL_MODO.
     Dos avisos por dia (manana y tarde): repetir la corrida el mismo dia no lo duplica (salvo ALERTA_FORZAR=1, para pruebas).
     Power Automate lee esta fuente y envia el correo desde la cuenta de Outlook de la organizacion. Devuelve texto para el log."""
     try:
         modo = env.get("EMAIL_MODO", "diario").strip().lower() or "diario"
-        if not debe_enviar(ilpi_hoy, modo, tormenta):
-            return "modo alerta: ningun punto en Alto o superior ni tormenta probable, no se agrega aviso"
+        if not debe_enviar(ilpi_hoy, modo, tormenta, br or None):
+            return "modo alerta: ningun punto en Alto o superior ni Boton Rojo, no se agrega aviso"
         ahora = ahora or _dt.datetime.now(_dt.timezone.utc)
         url = url_pagina(env)
         turno = turno_del_dia(ahora)
-        asunto, cuerpo = construir(ilpi_hoy, actualizado, url, tormenta, turno)
+        asunto, cuerpo = construir(ilpi_hoy, actualizado, url, tormenta, turno, br)
         guid = f"ilpi-{hoy:%Y-%m-%d}-{turno}" + (f"-{ahora:%H%M%S}" if env.get("ALERTA_FORZAR", "").strip() == "1" else "")
         items = _leer_items(ruta)
         if any(i["guid"] == guid for i in items):
@@ -162,17 +195,17 @@ def actualizar_feed(ilpi_hoy, actualizado, ruta, hoy, env=os.environ, tormenta=N
         return f"error al actualizar el feed: {type(e).__name__}"
 
 
-def enviar_si_corresponde(ilpi_hoy, actualizado, env=os.environ, smtp_cls=smtplib.SMTP_SSL, tormenta=None):
+def enviar_si_corresponde(ilpi_hoy, actualizado, env=os.environ, smtp_cls=smtplib.SMTP_SSL, tormenta=None, br=False):
     """Devuelve un texto con lo ocurrido (para el log). Nunca lanza: el correo no debe romper la emision."""
     host, destino = env.get("SMTP_HOST", "").strip(), env.get("EMAIL_DESTINO", "").strip()
     if not host or not destino:
         return "sin SMTP_HOST o EMAIL_DESTINO: se omite"
     try:
         modo = env.get("EMAIL_MODO", "diario").strip().lower()
-        if not debe_enviar(ilpi_hoy, modo, tormenta):
+        if not debe_enviar(ilpi_hoy, modo, tormenta, br or None):
             return "modo alerta: ningun punto en Alto o superior, no se envia"
         url = url_pagina(env)
-        asunto, cuerpo = construir(ilpi_hoy, actualizado, url, tormenta)
+        asunto, cuerpo = construir(ilpi_hoy, actualizado, url, tormenta, br=br)
         usuario = env.get("SMTP_USER", "").strip()
         m = EmailMessage()
         m["Subject"], m["From"] = asunto, env.get("EMAIL_REMITENTE", usuario) or usuario

@@ -4,7 +4,7 @@ import os
 import datetime as dt
 import numpy as np
 import pandas as pd
-from . import colectores as col, pipeline as pl, reporte, grilla, firms, alerta, nieve as nv, viento as vi, rayos as ry
+from . import colectores as col, pipeline as pl, reporte, grilla, firms, alerta, nieve as nv, viento as vi, rayos as ry, boton_rojo as br_conaf
 from .config import *
 
 
@@ -187,8 +187,11 @@ def main():
         f.write(reporte.html(hoy_df, hist, stamp, mapa, avisos=avisos_est, tormenta=tormenta, logo=os.path.exists(os.path.join(DOCS, "img", "logo-white.png"))))
     with open(os.path.join(DOCS, "ilpi_ultimo.json"), "w", encoding="utf-8") as f:
         f.write(reporte.json_salida(hoy_df, stamp))
-    print("[correo]", alerta.enviar_si_corresponde(hoy_df, stamp, tormenta=tormenta))
-    print("[feed]", alerta.actualizar_feed(hoy_df, stamp, os.path.join(DOCS, "alertas.xml"), hoy, tormenta=tormenta))
+    fechas_br = sorted(hoy_df[hoy_df["Modelo"] == "ECMWF"]["Fecha_Valida"].unique())
+    br = br_conaf.consultar(COMUNAS_BR, [pd.Timestamp(f).strftime("%Y-%m-%d") for f in fechas_br])
+    print("[botón rojo]", "no disponible" if br is None else {f: {c: (None if v is None else v["activo"]) for c, v in d.items()} for f, d in br.items()})
+    print("[correo]", alerta.enviar_si_corresponde(hoy_df, stamp, tormenta=tormenta, br=br))
+    print("[feed]", alerta.actualizar_feed(hoy_df, stamp, os.path.join(DOCS, "alertas.xml"), hoy, tormenta=tormenta, br=br))
     print(hoy_df[hoy_df["Modelo"] == "ECMWF"].pivot(index="Punto", columns="Fecha_Valida", values="Clase").to_string())
 
 
