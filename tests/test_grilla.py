@@ -60,7 +60,7 @@ def test_mas_alto_es_mas_humedo_para_mismo_combustible():
     m = grilla.calcular_mapa(reg, pr, HOY, RUTA)
     t = grilla.cargar_terreno(RUTA)
     s, z = m["score"][0], t["elev"]
-    pasto = (t["dom"] == 30) & m["combustible"]
+    pasto = np.isin(t["dom"], [11, 12]) & (t["fuel"] > 0.9) & m["combustible"]
     bajo, alto = pasto & (z < 1500), pasto & (z > 2300)
     assert bajo.sum() > 50 and alto.sum() > 50
     assert np.nanmean(s[bajo]) > np.nanmean(s[alto])

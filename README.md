@@ -11,11 +11,14 @@ de incendios; la referencia oficial es CONAF / SENAPRED.
 4. **Estado de humedad del combustible fino** (módulo FFMC de Van Wagner, 1987) que se arrastra día a día y se guarda en `historico/estado_ffmc.csv`.
 5. **Índice** = sequedad del combustible muerto^0,45 × combustible^0,35 × propagación^0,20 (media geométrica ponderada).
    Detalle y supuestos en `ESPECIFICACION.md`.
-6. Mapa: el índice también se calcula por celda de 90 m en toda la cuenca (`ilpi/grilla.py`) con DEM, pendiente, exposición y cobertura (ESA WorldCover) de `datos/terreno_90m.npz`, que se genera una vez con `scripts/preparar_terreno.py` desde los TIFF de la tesis. El clima de los puntos se interpola por distancia y se corrige por altitud.
+6. Mapa: el índice también se calcula por celda de 90 m en toda la cuenca (`ilpi/grilla.py`) con DEM, pendiente, exposición y combustible de `datos/terreno_90m.npz` (catastro de uso de suelo y vegetación de CONAF 2020, con ESA WorldCover como respaldo fuera del límite de la cuenca), que se genera una vez con `scripts/preparar_terreno.py RUTA_TESIS RUTA/lulc_cuenca.tif` desde los TIFF de la tesis. El clima de los puntos se interpola por distancia y se corrige por altitud.
 7. Salida: `docs/index.html`, `docs/ilpi_ultimo.json` y el archivo `historico/ilpi_diario.csv` (todo lo emitido, para verificar después).
 
 El **WRF-SMN** se descarga y archiva (`historico/clima_pronostico.csv`) pero **todavía no alimenta el índice**: los nombres de sus
 variables de humedad y viento no están verificados. En el log de la primera corrida busca las líneas `[WRF] variables del archivo`.
+
+## Correo diario (opcional)
+Si defines estos secretos del repositorio, el flujo envía cada mañana un resumen por correo: `SMTP_HOST`, `SMTP_PORT` (465 por defecto), `SMTP_USER`, `SMTP_PASS` y `EMAIL_DESTINO` (el listado de difusión; varias direcciones separadas por coma). Opcionales: `EMAIL_REMITENTE` y `EMAIL_MODO` (`diario`, por defecto, o `alerta`, que solo envía si algún punto llega a Alto o más). Sin `SMTP_HOST` y `EMAIL_DESTINO` no se envía nada. En el log busca la línea `[correo]`.
 
 ## Puesta en marcha
 1. **Secretos** del repositorio (Settings → Secrets and variables → Actions): `AMBIENT_API_KEY`, `AMBIENT_APPLICATION_KEY`, `MAC_PORTILLO`, `MAC_TINGUIRIRICA`.

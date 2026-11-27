@@ -1,6 +1,7 @@
 """Pagina HTML corporativa (resumen, mapa por celda, tabla por punto, historial) y JSON con el ultimo indice emitido."""
 import json
 import pandas as pd
+from .config import PUNTOS
 
 DIAS = ["lun", "mar", "mié", "jue", "vie", "sáb", "dom"]
 CLASES = ["Bajo", "Moderado", "Alto", "Muy alto", "Extremo"]
@@ -97,6 +98,27 @@ D.dias.forEach(function(d,i){var b=document.createElement("button");b.textConten
 D.pts.forEach(function(p){var c=D.color[p.c[0]]||"#555";L.circleMarker([p.lat,p.lon],{radius:8,color:"#414042",weight:2,fillColor:c,fillOpacity:1}).addTo(m).bindTooltip("<b>"+p.n+"</b><br>"+p.c.map(function(x,k){return x+" "+p.s[k]}).join("<br>"));});
 ver(0);})();</script>"""
 
+_EXPL_CLASES = {"Bajo": "Combustible húmedo o con pocas posibilidades de propagación. Condiciones poco favorables para un fuego.",
+    "Moderado": "Combustible algo seco. Un fuego puede iniciarse y avanzar con dificultad; precaución con faenas que usen fuego o chispas.",
+    "Alto": "Combustible seco y propagación posible. Un fuego se inicia con facilidad y puede crecer rápido.",
+    "Muy alto": "Condiciones críticas: combustible muy seco, con viento o pendiente a favor. Un fuego sería difícil de controlar.",
+    "Extremo": "Máximo peligro relativo. Todas las condiciones favorecen un fuego de rápida propagación."}
+
+
+def _explicacion():
+    filas = "".join(f"<tr><td><span class='chip' style='background:{COLOR[c]};color:{TXT[c]}'>{c}</span></td>"
+                    f"<td>{UMBRAL[c]}</td><td>{_EXPL_CLASES[c]}</td></tr>" for c in CLASES)
+    return f"""<section><h2>Qué significa el índice</h2>
+<p class='nota'>Un número de 0 a 100: mientras más alto, más favorables son las condiciones para que un fuego se inicie y se propague.</p>
+<p>Es un índice <b>relativo</b>. Sirve para comparar un día con otro y un lugar con otro dentro de la cuenca, no para anunciar un incendio. Un valor alto no significa que habrá fuego, y uno bajo no lo descarta: el índice no considera las fuentes de ignición, como la actividad humana.</p>
+<table><tr><th style='text-align:left'>Clase</th><th>Puntaje</th><th style='text-align:left'>Qué indica</th></tr>{filas}</table>
+<div class='comp'>
+<div><b>Sequedad</b><p>Qué tan seco está el combustible fino muerto (pasto seco y hojarasca). Depende de temperatura, humedad, viento y lluvia de los días anteriores, y es la parte que más pesa en el índice.</p></div>
+<div><b>Combustible</b><p>Cuánto y qué tipo de vegetación hay en el lugar. El pastizal arde más fácil que el bosque nativo; la roca, la nieve y el agua no arden.</p></div>
+<div><b>Propagación</b><p>Qué tan rápido avanzaría el fuego, según el viento y la pendiente. Una ladera empinada con viento a favor acelera el avance.</p></div></div>
+<p class='nota'>Los puntajes y las clases son provisorios: aún no se calibran con incendios reales.</p></section>"""
+
+
 CSS = """
 @font-face{font-family:'Intro Book Alt';src:url('fonts/Intro-Book-Alt.otf') format('opentype');font-weight:400;font-style:normal;font-display:swap}
 @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700&display=swap');
@@ -143,6 +165,7 @@ td .sub{font-size:12px;color:var(--mid);margin-top:2px}td.vacio{color:var(--mid)
 .ley i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:6px;vertical-align:-1px}.ley small{color:var(--mid)}
 details{margin-top:8px}summary{cursor:pointer;font-weight:700;color:var(--cyan);color:#0086b3}
 details ul{margin:12px 0 0;padding-left:20px;font-size:15px}details li{margin:6px 0}
+table td:nth-child(3){text-align:left}.comp{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin:6px 0 10px}.comp>div{background:var(--cyan-x);border-radius:var(--r-md);padding:12px 16px}.comp b{font-family:var(--brand);font-weight:400;font-size:17px}.comp p{margin:4px 0 0;font-size:14px}
 footer{display:flex;align-items:center;gap:12px;color:var(--mid);font-size:13px;padding:6px 0 34px}
 footer img{height:34px;width:auto}
 @media(max-width:640px){.cab h1{font-size:22px}.cab img{height:50px}.cab .fecha{margin-left:0;text-align:left}#mapa{height:420px}}
@@ -160,7 +183,7 @@ def html(ilpi_hoy, historial, actualizado, mapa=None, logo=False):
     graf = ""
     if historial is not None and not historial.empty:
         import plotly.graph_objects as go
-        h = historial[(historial["Lead"] == 0) & (historial["Modelo"] == "ECMWF")]
+        h = historial[(historial["Lead"] == 0) & (historial["Modelo"] == "ECMWF") & (historial["Punto"].isin(list(PUNTOS)))]
         fig = go.Figure()
         for pto, g in h.groupby("Punto"):
             g = g.sort_values("Emision")
@@ -169,6 +192,7 @@ def html(ilpi_hoy, historial, actualizado, mapa=None, logo=False):
                           margin=dict(l=50, r=20, t=20, b=40), legend=dict(orientation="h", y=-0.2),
                           colorway=["#00ABE5", "#5BBDB5", "#7AB929", "#414042", "#7F7F7F"], font=dict(family="Nunito, sans-serif", color="#414042"))
         graf = fig.to_html(full_html=False, include_plotlyjs="cdn")
+    expl = _explicacion()
     kpis = _kpis(ilpi_hoy, mapa)
     sec_kpis = f"<div class='kpis'>{kpis}</div>" if kpis else ""
     sec_mapa = (f"<section><h2>Mapa de peligro</h2><p class='nota'>Celdas de 90 m. Se pinta solo donde hay combustible relevante; roca, nieve y agua quedan sin color.</p>"
@@ -192,12 +216,13 @@ No es un pronóstico oficial ni predice la ocurrencia de incendios. Referencia o
 <table><tr><th>Punto</th>{cab}</tr>{filas}</table></section>
 {sec_barras}
 {sec_graf}
+{expl}
 <section><h2>Cómo se calcula</h2>
 <details><summary>Metodología y limitaciones</summary><ul>
-<li><b>Datos:</b> estaciones meteorológicas propias (BT Portillo y BT Tinguiririca), modelos ECMWF IFS y GFS (Open-Meteo), terreno desde un DEM de 30 m y cobertura ESA WorldCover de 10 m.</li>
+<li><b>Datos:</b> estaciones meteorológicas propias (BT Portillo y BT Tinguiririca), modelos ECMWF IFS y GFS (Open-Meteo), terreno desde un DEM de 30 m y combustible desde el catastro de uso de suelo y vegetación de CONAF (actualización 2020), con ESA WorldCover de 10 m como respaldo fuera del límite de la cuenca.</li>
 <li><b>Índice:</b> sequedad del combustible muerto (FFMC, Van Wagner 1987) × tipo de combustible × potencial de propagación (viento y pendiente), como media geométrica ponderada. Pendiente y exposición se consideran en cada celda.</li>
 <li><b>Clases (provisorias):</b> Bajo &lt; 30 · Moderado 30–50 · Alto 50–65 · Muy alto 65–80 · Extremo ≥ 80.</li>
-<li><b>Limitaciones:</b> sin nieve ni humedad de la vegetación viva (NDMI); la cobertura no distingue bosque nativo de plantación; el viento no incorpora el relieve; el mapa cubre solo la cuenca alta y media.</li>
+<li><b>Limitaciones:</b> sin nieve ni humedad de la vegetación viva (NDMI); el catastro no distingue la carga ni la continuidad del combustible dentro de cada clase; el viento no incorpora el relieve; el mapa cubre solo la cuenca alta y media.</li>
 </ul></details></section>
 <footer><img src="img/iso-color.png" alt=""><span>Botón Rojo TE · uso interno y experimental. Mapa base © OpenStreetMap.</span></footer>
 </div></body></html>"""

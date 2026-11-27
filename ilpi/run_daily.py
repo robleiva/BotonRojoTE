@@ -4,7 +4,7 @@ import os
 import datetime as dt
 import numpy as np
 import pandas as pd
-from . import colectores as col, pipeline as pl, reporte, grilla, firms
+from . import colectores as col, pipeline as pl, reporte, grilla, firms, alerta
 from .config import *
 
 
@@ -141,6 +141,7 @@ def main():
         f.write(reporte.html(hoy_df, hist, stamp, mapa, logo=os.path.exists(os.path.join(DOCS, "img", "logo-white.png"))))
     with open(os.path.join(DOCS, "ilpi_ultimo.json"), "w", encoding="utf-8") as f:
         f.write(reporte.json_salida(hoy_df, stamp))
+    print("[correo]", alerta.enviar_si_corresponde(hoy_df, stamp))
     print(hoy_df[hoy_df["Modelo"] == "ECMWF"].pivot(index="Punto", columns="Fecha_Valida", values="Clase").to_string())
 
 

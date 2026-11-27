@@ -27,7 +27,7 @@ Por qué un índice propio: el FWI global del ECMWF tuvo desempeño "excepcional
 | Meteorología diaria 15:00 local | Estaciones Tinguiririca Energía (verdad local) + ERA5‑Land vía Open‑Meteo (≈9 km) + estaciones DMC/DGA | ERA5‑Land listo en `fetch_data.py`; **estaciones propias por incorporar** |
 | Pronóstico (operación) | Modelo numérico abierto de alta resolución + DMC | Por definir |
 | Topografía | DEM Copernicus 90 m (Open‑Meteo Elevation); idealmente DEM 30 m | Pendiente/exposición a ~500 m listas |
-| Combustible | Catastro vegetacional CONAF / ESA WorldCover | **Pendiente** (hoy valor fijo 0,85) |
+| Combustible | Catastro de uso de suelo y vegetación CONAF, actualización 2020 (raster `lulc_cuenca.tif`, 19 clases); ESA WorldCover como respaldo fuera del límite de la cuenca | En uso desde v0.3 |
 | Estado hídrico vegetación | NDMI Sentinel‑2 (10–20 m) / MODIS | **Pendiente** |
 | Incendios para calibrar y validar | NASA FIRMS VIIRS; registros CONAF | FIRMS en `fetch_data.py` (requiere MAP_KEY); CONAF por solicitar |
 
@@ -65,8 +65,8 @@ Van Wagner (1987), *Development and structure of the Canadian Forest Fire Weathe
 
 
 ## Mapa por celda (v0.2)
-- Terreno a 90 m (datos/terreno_90m.npz): altitud, pendiente, exposición y peso de combustible (media ponderada por área de ESA WorldCover 10 m; pesos: arbolado 0,5, matorral 0,85, pastizal 1,0, cultivo 0,4, suelo desnudo/ralo 0,1, musgo/liquen 0,3, urbano/nieve/agua 0). Cobertura solo hasta la longitud -70,726 (no incluye La Rufina ni San Fernando).
+- Terreno a 90 m (datos/terreno_90m.npz): altitud, pendiente, exposición y peso de combustible (media por celda del catastro CONAF, 3×3 submuestras; pesos provisorios: bosque nativo 0,5; matorral y matorral arborescente 0,85; matorral-pradera 0,95; pradera 1,0; matorral con suculentas 0,6; rotación cultivo-pradera 0,5; agrícola 0,4; bofedal 0,1; vega 0,2; sobre el límite altitudinal 0,1; otros sin vegetación 0,05; agua, nieve, glaciar, roca y urbano 0. Donde CONAF no tiene dato, ESA WorldCover 10 m). Cobertura solo hasta la longitud -70,726 (no incluye La Rufina ni San Fernando).
 - Clima: los puntos (estación o ECMWF) se llevan a 1.500 m, se interpolan por distancia inversa al cuadrado y se corrigen a la altitud de cada celda; viento con media vectorial.
 - FFMC por celda: se reconstruye en cada corrida con los últimos 30 días registrados (F0 = 85) y se continúa con el pronóstico ECMWF.
 - Se colorean solo celdas con peso de combustible >= 0,15. Clases provisorias (30/50/65/80), sin calibrar.
-- Limitaciones: WorldCover no distingue bosque nativo de plantación; sin NDMI ni nieve; el viento no incorpora efectos del relieve; la lluvia no varía con la altitud.
+- Limitaciones: el catastro no mide carga ni continuidad del combustible dentro de cada clase; sin NDMI ni nieve; el viento no incorpora efectos del relieve; la lluvia no varía con la altitud.
