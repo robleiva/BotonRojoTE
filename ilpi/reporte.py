@@ -202,6 +202,9 @@ header:after{content:"";position:absolute;right:-60px;top:-60px;width:240px;heig
 section{background:#fff;border-radius:var(--r-lg);padding:22px 24px;margin:20px 0;box-shadow:var(--sombra)}
 section h2{font-size:24px;margin:0 0 4px}
 section .nota{margin:0 0 16px;font-size:14px;color:var(--mid)}
+.aviso-est{background:#FFF4D6;border-left:4px solid #F2C200;border-radius:8px;padding:10px 14px;margin:0 0 14px;font-size:14px}
+.tors{display:flex;flex-wrap:wrap;gap:14px 28px;margin-top:6px}.tor .et{font-size:13px;color:var(--mid);margin-bottom:4px}
+section.torm{border-left:4px solid #F2C200}
 .chip{display:inline-block;padding:3px 12px;border-radius:9999px;font-weight:700;font-size:13px;white-space:nowrap}
 #mapa{height:540px;border-radius:var(--r-md);border:1px solid var(--light)}
 .tabs{margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap}
@@ -272,7 +275,26 @@ def _historial(historial):
     return fig.to_html(full_html=False, include_plotlyjs="cdn", config={"displayModeBar": False})
 
 
-def html(ilpi_hoy, historial, actualizado, mapa=None, logo=False):
+def _tormenta(tormenta):
+    """Seccion de posibilidad de tormenta electrica: un chip por dia. Vacia si no hay datos."""
+    if tormenta is None or len(tormenta) == 0:
+        return ""
+    estilos = [("Sin señal", "#E5E8EA", "#414042"), ("Posible", "#F2C200", "#414042"), ("Probable", "#E03131", "#FFFFFF")]
+    chips = ""
+    for r in tormenta.itertuples():
+        n, bg, fg = estilos[int(r.Nivel)]
+        cape = f"CAPE {r.CAPE:.0f} J/kg" if pd.notna(r.CAPE) else "sin dato"
+        chips += (f"<div class='tor'><div class='et'>{_dia(r.Fecha)}</div><span class='chip' style='background:{bg};color:{fg}' title='{cape}'>{n}</span></div>")
+    alto = bool((tormenta["Nivel"] >= 1).any())
+    pre = "⚡ " if alto else ""
+    clase = " class='torm'" if alto else ""
+    return (f"<section{clase}><h2>{pre}Posibilidad de tormenta eléctrica</h2>"
+            "<p class='nota'>Los rayos son una fuente natural de ignición: con combustible seco, una tormenta puede iniciar un fuego aunque el índice no lo refleje. "
+            "Se estima con la inestabilidad de la atmósfera en la tarde (CAPE) según el modelo. No es un pronóstico de rayos y los umbrales son provisorios, aún sin calibrar con rayos observados.</p>"
+            f"<div class='tors'>{chips}</div></section>")
+
+
+def html(ilpi_hoy, historial, actualizado, mapa=None, logo=False, avisos=None, tormenta=None):
     fechas = sorted(ilpi_hoy["Fecha_Valida"].unique()) if not ilpi_hoy.empty else []
     filas = ""
     for pto in ilpi_hoy["Punto"].unique() if not ilpi_hoy.empty else []:
@@ -285,6 +307,8 @@ def html(ilpi_hoy, historial, actualizado, mapa=None, logo=False):
                     if _calibrado() else "las clases son provisorias, aún sin calibrar con incendios reales.")
     kpis = _kpis(ilpi_hoy, mapa)
     sec_kpis = f"<div class='kpis'>{kpis}</div>" if kpis else ""
+    sec_avisos = "".join(f"<div class='aviso-est'>⚠ {a}</div>" for a in (avisos or []))
+    sec_tor = _tormenta(tormenta)
     sec_mapa = (f"<section><h2>Mapa de peligro</h2><p class='nota'>Celdas de 90 m. Se pinta solo donde hay combustible relevante; roca, nieve y agua quedan sin color.</p>"
                 f"{_mapa_html(mapa, ilpi_hoy)}</section>") if mapa else ""
     sec_barras = (f"<section><h2>Superficie con combustible por clase de peligro</h2>"
@@ -300,7 +324,9 @@ def html(ilpi_hoy, historial, actualizado, mapa=None, logo=False):
 <div class="w">
 <div class="aviso"><b>EXPERIMENTAL.</b> Índice relativo (0–100) con pesos provisorios; {aviso_clases}
 No es un pronóstico oficial ni predice la ocurrencia de incendios. Referencia oficial: CONAF y SENAPRED.</div>
+{sec_avisos}
 {sec_kpis}
+{sec_tor}
 {sec_mapa}
 <section><h2>Peligro por punto de monitoreo</h2>
 <p class='nota'>Valor ECMWF IFS a las 15:00 locales · segundo número: rango entre modelos (ECMWF y GFS). * día con datos incompletos.</p>

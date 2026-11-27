@@ -4,7 +4,7 @@ import os
 import datetime as dt
 import numpy as np
 import pandas as pd
-from . import colectores as col, pipeline as pl, reporte, grilla, firms, alerta, nieve as nv, viento as vi
+from . import colectores as col, pipeline as pl, reporte, grilla, firms, alerta, nieve as nv, viento as vi, rayos as ry
 from .config import *
 
 
@@ -51,11 +51,14 @@ def main():
         obs = _upsert(pd.concat(nuevas), obs, ["Punto", "Fecha_Local"])
         obs.to_csv(F_OBS, index=False)
     print(f"[estaciones] {0 if obs.empty else len(obs)} registros horarios en historico")
+    avisos_est = []
     for pto in ESTACIONES:                       # aviso si una estacion lleva dias sin reportar
         o = obs[obs["Punto"] == pto] if not obs.empty else obs
         if o.empty or (hoy - o["Fecha_Local"].max().normalize()).days >= 2:
             ult = "nunca" if o.empty else f"{o['Fecha_Local'].max():%Y-%m-%d %H:%M}"
             print(f"[estaciones] ATENCION: {pto} sin datos recientes (ultimo registro: {ult}); el indice de ese punto usa el modelo")
+            avisos_est.append(f"La estación {pto} no reporta datos " + ("todavía" if o.empty else f"desde el {o['Fecha_Local'].max():%d-%m}") +
+                              ": el índice de ese punto se calcula solo con el modelo.")
 
     # 2. Modelos (Open-Meteo): 15 h registrado (pasado) y pronostico
     reg_modelo, pron = [], []
@@ -111,6 +114,19 @@ def main():
     ult = nieve_df[nieve_df["Fecha"] == hoy] if not nieve_df.empty else nieve_df
     print(f"[nieve] {len(nv_nuevo)}/{len(PUNTOS)} puntos con dato; hoy: " +
           (", ".join(f"{r.Punto} {r.NIEVE:.2f} m, isoterma 0 C {r.FZL:.0f} m" for r in ult.itertuples()) if not ult.empty else "sin dato (no se aplica nieve)"))
+
+    # 3c. Posibilidad de tormenta electrica (CAPE del modelo). Si falla, simplemente no se muestra.
+    ry_nuevo = []
+    for pto, m in PUNTOS.items():
+        d = ry.fetch(m["lat"], m["lon"], past_days=2, forecast_days=DIAS_PRON + 1)
+        if not d.empty and d["CAPE"].notna().any():
+            ry_nuevo.append(d.assign(Punto=pto))
+    rayos_df = _upsert(pd.concat(ry_nuevo)[ry.COLS], _leer(F_RAYOS, ["Fecha"]), ["Punto", "Fecha"]) if ry_nuevo else _leer(F_RAYOS, ["Fecha"])
+    if not rayos_df.empty:
+        rayos_df.to_csv(F_RAYOS, index=False)
+    tormenta = ry.por_dia(rayos_df, desde=hoy)
+    print(f"[rayos] {len(ry_nuevo)}/{len(PUNTOS)} puntos con CAPE; " +
+          (", ".join(f"{r.Fecha:%d-%m} CAPE {r.CAPE:.0f} -> {ry.NIVELES[r.Nivel]}" for r in tormenta.itertuples()) if not tormenta.empty else "sin dato (no se muestra)"))
 
     # 4. Estado + indice
     estado = _leer(F_ESTADO, ["Fecha"])
@@ -168,10 +184,10 @@ def main():
     except Exception as e:                      # el mapa nunca debe impedir la emision por punto
         print(f"[mapa] omitido: {e}")
     with open(os.path.join(DOCS, "index.html"), "w", encoding="utf-8") as f:
-        f.write(reporte.html(hoy_df, hist, stamp, mapa, logo=os.path.exists(os.path.join(DOCS, "img", "logo-white.png"))))
+        f.write(reporte.html(hoy_df, hist, stamp, mapa, avisos=avisos_est, tormenta=tormenta, logo=os.path.exists(os.path.join(DOCS, "img", "logo-white.png"))))
     with open(os.path.join(DOCS, "ilpi_ultimo.json"), "w", encoding="utf-8") as f:
         f.write(reporte.json_salida(hoy_df, stamp))
-    print("[correo]", alerta.enviar_si_corresponde(hoy_df, stamp))
+    print("[correo]", alerta.enviar_si_corresponde(hoy_df, stamp, tormenta=tormenta))
     print(hoy_df[hoy_df["Modelo"] == "ECMWF"].pivot(index="Punto", columns="Fecha_Valida", values="Clase").to_string())
 
 
