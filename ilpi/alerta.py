@@ -20,6 +20,11 @@ COLOR = {"Bajo": "#2f9e44", "Moderado": "#d9a900", "Alto": "#f08c00", "Muy alto"
 DIAS = ["lun", "mar", "mié", "jue", "vie", "sáb", "dom"]
 
 
+def _cortes():
+    from . import fireindex as fi
+    return [f"{x:g}" for x in fi.PROV_BREAKS]
+
+
 def _tabla(ilpi_hoy):
     e = ilpi_hoy[ilpi_hoy["Modelo"] == "ECMWF"]
     fechas = sorted(e["Fecha_Valida"].unique())
@@ -54,7 +59,7 @@ def debe_enviar(ilpi_hoy, modo="diario", tormenta=None):
 def construir(ilpi_hoy, actualizado, url="", tormenta=None):
     e, fechas = _tabla(ilpi_hoy)
     c = clase_maxima(ilpi_hoy) or "sin datos"
-    cab = "".join(f"<th style='padding:6px 10px;background:#E5F5FD'>{DIAS[f.weekday()]} {f:%d-%m}</th>" for f in fechas)
+    cab = "".join(f"<th style='font-weight:400;color:#5b6b76;padding:6px 10px;background:#E5F5FD'>{DIAS[f.weekday()]} {f:%d-%m}</th>" for f in fechas)
     filas = ""
     for pto in e["Punto"].unique():
         celdas = ""
@@ -66,17 +71,25 @@ def construir(ilpi_hoy, actualizado, url="", tormenta=None):
                 r = g.iloc[0]
                 celdas += (f"<td style='text-align:center;padding:6px 10px'><span style='background:{COLOR[r['Clase']]};color:#fff;"
                            f"border-radius:10px;padding:2px 9px;font-size:12px'>{r['Clase']}</span> {r['Score']:.0f}</td>")
-        filas += f"<tr><td style='padding:6px 10px'><b>{_h.escape(str(pto))}</b></td>{celdas}</tr>"
+        filas += f"<tr><td style='padding:6px 10px'>{_h.escape(str(pto))}</td>{celdas}</tr>"
     tt = _texto_tormenta(tormenta)
-    bloque_t = (f"<p style='background:#FFF4D6;border-radius:8px;padding:8px 12px'>⚡ <b>{_h.escape(tt)}.</b> Aproximación con la inestabilidad "
-                f"del modelo, no un pronóstico de rayos. Una tormenta con combustible seco puede iniciar un fuego.</p>") if tt else ""
-    enlace = f"<p><a href='{url}'>Ver el mapa y el detalle</a></p>" if url else ""
+    bloque_t = (f"<p style='background:#FFF4D6;border-radius:6px;padding:6px 10px;font-size:12px;margin:10px 0 0'>⚡ {_h.escape(tt)}. "
+                f"Estimación con la inestabilidad del modelo, no un pronóstico de rayos; con combustible seco una tormenta puede iniciar un fuego.</p>") if tt else ""
+    enlace = f"<p style='margin:14px 0 0'><a href='{url}'>Ver el mapa y el detalle</a></p>" if url else ""
+    cortes = _cortes()
+    rangos = [f"menos de {cortes[0]}", f"{cortes[0]} a {cortes[1]}", f"{cortes[1]} a {cortes[2]}", f"{cortes[2]} a {cortes[3]}", f"{cortes[3]} o más"]
+    leyenda = "".join(
+        f"<span style='display:inline-block;margin:2px 10px 2px 0;white-space:nowrap'><span style='background:{COLOR[n]};color:#fff;"
+        f"border-radius:10px;padding:1px 8px;font-size:11px'>{n}</span> <span style='font-size:11px;color:#7F7F7F'>{r}</span></span>"
+        for n, r in zip(ORDEN, rangos))
+    bloque_l = (f"<p style='margin:12px 0 0;font-size:11px;color:#7F7F7F'>Índice de 0 a 100: mientras más alto, más favorables son las "
+                f"condiciones para que un fuego se inicie y se propague.</p><div style='margin:4px 0 0'>{leyenda}</div>")
     cuerpo = (f"<div style='font-family:Nunito,Arial,sans-serif;color:#414042;max-width:640px'>"
-              f"<h2 style='color:#00ABE5;font-weight:400'>Peligro de incendios forestales: máximo {c}</h2>"
-              f"<p>Cuenca del río Tinguiririca. Actualizado {actualizado}.</p>{bloque_t}"
-              f"<table style='border-collapse:collapse;width:100%;font-size:14px'><tr><th style='text-align:left;padding:6px 10px;background:#E5F5FD'>Punto</th>{cab}</tr>{filas}</table>"
-              f"{enlace}"
-              f"<p style='font-size:12px;color:#7F7F7F'><b>Experimental.</b> Índice relativo, aún sin calibrar con incendios reales. "
+              f"<h2 style='color:#00ABE5;font-weight:400;margin:0 0 4px'>Peligro de incendios forestales: máximo {c}</h2>"
+              f"<p style='margin:0 0 12px;color:#7F7F7F;font-size:13px'>Cuenca del río Tinguiririca. Actualizado {actualizado}.</p>"
+              f"<table style='border-collapse:collapse;width:100%;font-size:14px'><tr><th style='text-align:left;font-weight:400;color:#5b6b76;padding:6px 10px;background:#E5F5FD'>Punto</th>{cab}</tr>{filas}</table>"
+              f"{bloque_t}{bloque_l}{enlace}"
+              f"<p style='font-size:11px;color:#7F7F7F;margin:14px 0 0'>Experimental: índice relativo, aún sin calibrar con incendios reales. "
               f"No es un pronóstico oficial; la referencia oficial es CONAF y SENAPRED.</p></div>")
     return f"Peligro de incendios Tinguiririca: {c}", cuerpo
 
