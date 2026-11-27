@@ -4,7 +4,7 @@ import os
 import datetime as dt
 import numpy as np
 import pandas as pd
-from . import colectores as col, pipeline as pl, reporte, grilla, firms, alerta, nieve as nv
+from . import colectores as col, pipeline as pl, reporte, grilla, firms, alerta, nieve as nv, viento as vi
 from .config import *
 
 
@@ -69,6 +69,17 @@ def main():
     reg_modelo, pron = pd.concat(reg_modelo), pd.concat(pron)
     pron = pron[pron["Fecha"] <= hoy + pd.Timedelta(days=DIAS_PRON)]
 
+    # 2b. Viento: correccion con las estaciones propias (solo con >= 30 dias de comparacion)
+    pron_hist = _leer(F_PRON, ["Fecha", "Emision"])
+    fac_v, info_v = vi.factores(obs, pron_hist, list(PUNTOS))
+    for pto, (n, razon) in info_v.items():
+        print(f"[viento] {pto}: {n} dias comparados, razon mediana medido/modelo {razon:.2f} -> " +
+              (f"factor aplicado {fac_v[pto]:.2f}" if pto in fac_v else f"sin corregir (faltan {vi.MIN_DIAS - n} dias)"))
+    if not info_v:
+        print("[viento] sin mediciones de viento de estaciones: se usa el modelo")
+    pron_crudo = pron                       # lo archivado es el viento SIN corregir (si no, la correccion se acumularia dia a dia)
+    reg_modelo, pron = vi.aplicar(reg_modelo, fac_v), vi.aplicar(pron, fac_v)
+
     # 3. Clima registrado: estacion (si esta completa) > modelo
     reg = reg_modelo.copy()
     for pto in ESTACIONES:
@@ -107,7 +118,7 @@ def main():
     hist.to_csv(F_ILPI, index=False)
 
     # 5. Pronostico del clima por modelo, archivado (para verificar despues)
-    p_arch = _upsert(pron.assign(Emision=hoy), _leer(F_PRON, ["Fecha", "Emision"]), ["Emision", "Punto", "Modelo", "Fecha"])
+    p_arch = _upsert(pron_crudo.assign(Emision=hoy), _leer(F_PRON, ["Fecha", "Emision"]), ["Emision", "Punto", "Modelo", "Fecha"])
     p_arch.to_csv(F_PRON, index=False)
 
     # 6. WRF-SMN: solo se archiva (no alimenta el indice en esta version)

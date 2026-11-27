@@ -313,7 +313,7 @@ No es un pronóstico oficial ni predice la ocurrencia de incendios. Referencia o
 <li><b>Datos:</b> estaciones meteorológicas propias (BT Portillo y BT Tinguiririca), modelos ECMWF IFS y GFS (Open-Meteo), terreno desde un DEM de 30 m y combustible desde el catastro de uso de suelo y vegetación de CONAF (actualización 2020), con ESA WorldCover de 10 m como respaldo fuera del límite de la cuenca.</li>
 <li><b>Índice:</b> sequedad del combustible muerto (FFMC, Van Wagner 1987) × tipo de combustible × potencial de propagación (viento y pendiente), como media geométrica ponderada. Pendiente y exposición se consideran en cada celda.</li>
 <li>{_texto_clases()}</li>
-<li><b>Limitaciones:</b> la nieve es una estimación del modelo (profundidad y altura de la isoterma 0 °C), sin satélite, y no hay humedad de la vegetación viva (NDMI); el catastro no distingue la carga ni la continuidad del combustible dentro de cada clase; el viento no incorpora el relieve; el mapa cubre solo la cuenca alta y media.</li>
+<li><b>Limitaciones:</b> la nieve es una estimación del modelo (profundidad y altura de la isoterma 0 °C), sin satélite, y no hay humedad de la vegetación viva (NDMI); el catastro no distingue la carga ni la continuidad del combustible dentro de cada clase; el viento del modelo se corrige con las estaciones propias cuando hay al menos 30 días de comparación, y no incorpora el relieve; el mapa cubre solo la cuenca alta y media.</li>
 </ul></details></section>
 <footer><img src="img/iso-color.png" alt=""><span>Botón Rojo TE · uso interno y experimental. Mapa base y capa de ignición © colaboradores de OpenStreetMap.</span></footer>
 </div></body></html>"""
