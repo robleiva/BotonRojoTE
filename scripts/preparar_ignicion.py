@@ -6,6 +6,7 @@ Necesita internet (Overpass API). Se ejecuta desde GitHub Actions: flujo "Capa d
 import datetime as dt
 import json
 import sys
+import time
 from pathlib import Path
 
 import numpy as np
@@ -20,7 +21,10 @@ def main():
     ter = grilla.cargar_terreno(RAIZ / "datos" / "terreno_90m.npz")
     (sur, oeste), (norte, este) = grilla.limites(ter)
     q_lin, q_edi = ignicion.consultas(sur, oeste, norte, este)
-    caminos, lineas, edificios = ignicion.parsear(ignicion.descargar(q_lin), ignicion.descargar(q_edi))
+    j_lin = ignicion.descargar(q_lin)
+    time.sleep(20)                       # cortesia con el servidor entre una consulta y otra
+    j_edi = ignicion.descargar(q_edi)
+    caminos, lineas, edificios = ignicion.parsear(j_lin, j_edi)
     print(f"OSM: {len(caminos)} tramos de camino, {len(lineas)} tramos de linea electrica, {len(edificios)} edificaciones")
     if not (caminos or lineas or edificios):
         raise SystemExit("Overpass no devolvio elementos: no se escribe nada")

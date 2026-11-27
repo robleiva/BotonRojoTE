@@ -10,7 +10,10 @@ import time
 import numpy as np
 import requests
 
-URLS = ["https://overpass-api.de/api/interpreter", "https://overpass.kumi.systems/api/interpreter"]
+URLS = ["https://overpass-api.de/api/interpreter", "https://overpass.private.coffee/api/interpreter",
+        "https://overpass.kumi.systems/api/interpreter"]
+CABECERAS = {"User-Agent": "BotonRojoTE/0.3 (indice local de peligro de incendios, Tinguiririca Energia; uso interno)",
+             "Accept": "application/json"}
 PESO_CAMINO = {"motorway": 0.8, "trunk": 0.8, "primary": 0.8, "secondary": 0.8, "tertiary": 0.8, "unclassified": 0.8,
                "residential": 0.8, "track": 0.5, "service": 0.5}
 PESO_LINEA = {"line": 0.6, "minor_line": 0.4}
@@ -27,19 +30,23 @@ def consultas(sur, oeste, norte, este):
     return lineas, edif
 
 
-def descargar(consulta, intentos=3):
-    ultimo = None
+def descargar(consulta, intentos=5, espera=30, dormir=time.sleep):
+    """POST a Overpass con identificacion (User-Agent) y reintentos con espera creciente.
+    Los servidores publicos limitan la tasa (HTTP 429/504): se prueba cada espejo y se vuelve a intentar."""
+    errores = []
     for i in range(intentos):
         for url in URLS:
             try:
-                r = requests.post(url, data={"data": consulta}, timeout=300)
+                r = requests.post(url, data={"data": consulta}, headers=CABECERAS, timeout=300)
                 if r.status_code == 200:
                     return r.json()
-                ultimo = f"{url}: HTTP {r.status_code}"
+                errores.append(f"{url.split('/')[2]} HTTP {r.status_code}")
             except Exception as e:
-                ultimo = f"{url}: {type(e).__name__}"
-        time.sleep(15 * (i + 1))
-    raise RuntimeError(f"Overpass no respondio ({ultimo})")
+                errores.append(f"{url.split('/')[2]} {type(e).__name__}")
+        print(f"[OSM] intento {i + 1}/{intentos} fallido: {'; '.join(errores[-len(URLS):])}", flush=True)
+        if i < intentos - 1:
+            dormir(espera * (i + 1))
+    raise RuntimeError("Overpass no respondio: " + "; ".join(errores[-len(URLS):]))
 
 
 def parsear(json_lineas, json_edif):

@@ -41,3 +41,31 @@ def test_capa_en_el_mapa_y_en_la_pagina(tmp_path):
     assert grilla.cargar_ignicion(str(f), ter["valido"]).max() == 90
     assert grilla.cargar_ignicion(str(tmp_path / "no.npz"), ter["valido"]) is None
     assert grilla.png_ignicion_base64(e)
+
+
+def test_descargar_reintenta_y_usa_user_agent(monkeypatch):
+    llamadas = []
+
+    class R:
+        def __init__(self, c): self.status_code = c
+        def json(self): return {"elements": []}
+
+    def post(url, data=None, headers=None, timeout=None):
+        llamadas.append((url, headers))
+        return R(429 if len(llamadas) < 5 else 200)
+
+    monkeypatch.setattr(ignicion.requests, "post", post)
+    assert ignicion.descargar("q", dormir=lambda s: None) == {"elements": []}
+    assert len(llamadas) == 5 and "User-Agent" in llamadas[0][1]
+
+
+def test_descargar_informa_si_todos_fallan(monkeypatch):
+    class R:
+        status_code = 429
+
+    monkeypatch.setattr(ignicion.requests, "post", lambda *a, **k: R())
+    try:
+        ignicion.descargar("q", intentos=2, dormir=lambda s: None)
+        assert False
+    except RuntimeError as e:
+        assert "429" in str(e)
