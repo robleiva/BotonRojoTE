@@ -56,7 +56,13 @@ def debe_enviar(ilpi_hoy, modo="diario", tormenta=None):
     return tormenta is not None and len(tormenta) > 0 and bool((tormenta["Nivel"] >= 2).any())
 
 
-def construir(ilpi_hoy, actualizado, url="", tormenta=None):
+def turno_del_dia(ahora):
+    """'manana' si el aviso se genera antes de las 12:00 hora de Chile, 'tarde' si es despues (para planificar el dia siguiente)."""
+    from zoneinfo import ZoneInfo
+    return "manana" if ahora.astimezone(ZoneInfo("America/Santiago")).hour < 12 else "tarde"
+
+
+def construir(ilpi_hoy, actualizado, url="", tormenta=None, turno=""):
     e, fechas = _tabla(ilpi_hoy)
     c = clase_maxima(ilpi_hoy) or "sin datos"
     cab = "".join(f"<th style='font-weight:400;color:#5b6b76;padding:6px 10px;background:#E5F5FD'>{DIAS[f.weekday()]} {f:%d-%m}</th>" for f in fechas)
@@ -114,7 +120,7 @@ def _leer_items(ruta):
 
 def actualizar_feed(ilpi_hoy, actualizado, ruta, hoy, env=os.environ, tormenta=None, ahora=None, max_items=10):
     """Agrega al archivo RSS (docs/alertas.xml) el aviso del dia si corresponde segun EMAIL_MODO.
-    Un aviso por dia: repetir la corrida el mismo dia no lo duplica (salvo ALERTA_FORZAR=1, para pruebas).
+    Dos avisos por dia (manana y tarde): repetir la corrida el mismo dia no lo duplica (salvo ALERTA_FORZAR=1, para pruebas).
     Power Automate lee esta fuente y envia el correo desde la cuenta de Outlook de la organizacion. Devuelve texto para el log."""
     try:
         modo = env.get("EMAIL_MODO", "diario").strip().lower() or "diario"
@@ -122,8 +128,9 @@ def actualizar_feed(ilpi_hoy, actualizado, ruta, hoy, env=os.environ, tormenta=N
             return "modo alerta: ningun punto en Alto o superior ni tormenta probable, no se agrega aviso"
         ahora = ahora or _dt.datetime.now(_dt.timezone.utc)
         url = url_pagina(env)
-        asunto, cuerpo = construir(ilpi_hoy, actualizado, url, tormenta)
-        guid = f"ilpi-{hoy:%Y-%m-%d}" + (f"-{ahora:%H%M%S}" if env.get("ALERTA_FORZAR", "").strip() == "1" else "")
+        turno = turno_del_dia(ahora)
+        asunto, cuerpo = construir(ilpi_hoy, actualizado, url, tormenta, turno)
+        guid = f"ilpi-{hoy:%Y-%m-%d}-{turno}" + (f"-{ahora:%H%M%S}" if env.get("ALERTA_FORZAR", "").strip() == "1" else "")
         items = _leer_items(ruta)
         if any(i["guid"] == guid for i in items):
             return f"ya hay un aviso para hoy ({guid}): no se duplica"

@@ -2,7 +2,7 @@ name: ILPI diario
 
 on:
   schedule:
-    - cron: '30 8 * * *'      # 08:30 UTC = 05:30 (verano) / 04:30 (invierno) hora de Chile
+    - cron: '30 8 * * *'      # 08:30 UTC = 05:30 (verano) / 04:30 (invierno) hora de Chile: aviso de la mañana, para el día en curso
   workflow_dispatch:
 
 concurrency:

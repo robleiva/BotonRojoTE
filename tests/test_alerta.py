@@ -86,3 +86,10 @@ def test_feed_respeta_modo_alerta_y_forzar(tmp_path):
     alerta.actualizar_feed(_feed_df(), "x", ruta, hoy, env={}, ahora=t0)
     r = alerta.actualizar_feed(_feed_df(), "x", ruta, hoy, env={"ALERTA_FORZAR": "1"}, ahora=t0 + dt.timedelta(minutes=5))
     assert r.startswith("aviso agregado")
+
+
+def test_turno_manana_y_tarde_hora_de_chile():
+    import datetime as dt
+    from ilpi import alerta
+    assert alerta.turno_del_dia(dt.datetime(2026, 11, 27, 8, 30, tzinfo=dt.timezone.utc)) == "manana"    # 05:30 Chile
+    assert alerta.turno_del_dia(dt.datetime(2026, 11, 27, 17, 40, tzinfo=dt.timezone.utc)) == "tarde"    # 14:40 Chile
