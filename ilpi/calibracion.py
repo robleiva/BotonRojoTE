@@ -31,30 +31,45 @@ def parsear(j):
     return d, j.get("elevation", np.nan)
 
 
-def descargar_punto(lat, lon, ini, fin, anios_por_llamada=1, espera=20, dormir=time.sleep):
-    """Serie horaria [ini, fin] en tramos; reintenta ante HTTP 429. Devuelve (DataFrame, elevacion del modelo)."""
+def descargar_punto(lat, lon, ini, fin, anios_por_llamada=1, espera=5, dormir=time.sleep, cache=None, intentos=10):
+    """Serie horaria [ini, fin] en tramos anuales. Devuelve (DataFrame, elevacion del modelo).
+
+    Open-Meteo a veces deja colgada una solicitud: se corta rapido (45 s de lectura) y se reintenta. Si se da `cache`
+    (carpeta), cada tramo descargado se guarda y no se vuelve a pedir, de modo que una ejecucion interrumpida continua donde quedo."""
+    import os
     trozos, elev = [], np.nan
     a = ini
     while a <= fin:
         b = min(dt.date(a.year + anios_por_llamada - 1, 12, 31), fin)
+        arch = os.path.join(cache, f"{lat:.4f}_{lon:.4f}_{a}_{b}.csv") if cache else None
+        if arch and os.path.exists(arch):
+            d = pd.read_csv(arch, parse_dates=["Fecha_Local"])
+            elev = float(d["elev"].iloc[0]) if "elev" in d else np.nan
+            trozos.append(d.drop(columns=["elev"], errors="ignore"))
+            a = b + dt.timedelta(days=1)
+            continue
         params = {"latitude": lat, "longitude": lon, "start_date": a.isoformat(), "end_date": b.isoformat(),
                   "hourly": ",".join(VARS.values()), "timezone": ZONA, "wind_speed_unit": "kmh"}
-        for intento in range(8):
+        motivo = "sin intentos"
+        for intento in range(intentos):
             try:
-                r = requests.get(URL, params=params, headers=CABECERAS, timeout=(20, 240))
+                r = requests.get(URL, params=params, headers=CABECERAS, timeout=(15, 45))
                 if r.status_code == 200:
                     d, elev = parsear(r.json())
                     trozos.append(d)
+                    if arch:
+                        os.makedirs(cache, exist_ok=True)
+                        d.assign(elev=elev).to_csv(arch, index=False)
                     break
                 motivo = f"HTTP {r.status_code}"
             except requests.exceptions.RequestException as e:     # tiempo agotado, conexion cortada, etc.
                 motivo = type(e).__name__
-            print(f"[calibracion] {motivo} en {a}..{b} (intento {intento + 1}/8)", flush=True)
+            print(f"[calibracion] {motivo} en {a}..{b} (intento {intento + 1}/{intentos})", flush=True)
             dormir(espera * (intento + 1))
         else:
             raise RuntimeError(f"Open-Meteo no respondio para {a}..{b} ({motivo})")
         a = b + dt.timedelta(days=1)
-        dormir(3)
+        dormir(1)
     return pd.concat(trozos, ignore_index=True), elev
 
 

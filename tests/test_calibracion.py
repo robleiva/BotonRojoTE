@@ -62,3 +62,18 @@ def test_pagina_muestra_clases_calibradas(monkeypatch):
 
 def test_sin_archivo_usa_cortes_base():
     assert fi.PROV_BREAKS_BASE == [30, 50, 65, 80]
+
+
+def test_cache_evita_repetir_descargas(monkeypatch, tmp_path):
+    llamadas = []
+
+    class R:
+        status_code = 200
+        def json(self): return {"elevation": 1234, "hourly": {"time": ["2000-07-01T00:00"], "temperature_2m": [5.0], "relative_humidity_2m": [60],
+                                                              "wind_speed_10m": [3], "wind_direction_10m": [90], "precipitation": [0]}}
+
+    monkeypatch.setattr(calibracion.requests, "get", lambda *a, **k: llamadas.append(1) or R())
+    args = (-34.9, -70.5, dt.date(2000, 7, 1), dt.date(2000, 12, 31))
+    d1, z1 = calibracion.descargar_punto(*args, dormir=lambda s: None, cache=str(tmp_path))
+    d2, z2 = calibracion.descargar_punto(*args, dormir=lambda s: None, cache=str(tmp_path))
+    assert len(llamadas) == 1 and z1 == z2 == 1234 and len(d2) == 1 and list(d2.columns) == list(d1.columns)

@@ -10,7 +10,7 @@ concurrency:
 jobs:
   calibrar:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 180
     permissions:
       contents: write
     steps:
@@ -27,8 +27,22 @@ jobs:
       - name: Pruebas
         run: python -m pytest -q
 
+      - name: Recuperar descargas anteriores
+        uses: actions/cache/restore@v4
+        with:
+          path: cache_calibracion
+          key: calib-${{ github.run_id }}
+          restore-keys: calib-
+
       - name: Descargar clima historico y calcular los cortes
         run: python scripts/calibrar_percentiles.py
+
+      - name: Guardar descargas (aunque falle, para continuar despues)
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: cache_calibracion
+          key: calib-${{ github.run_id }}
 
       - name: Guardar la calibracion
         run: |
