@@ -30,7 +30,7 @@ def _cargar_cortes():
     try:
         with open(ruta, encoding="utf-8") as f:
             d = json.load(f)
-        c = [float(x) for x in d["cortes"]]
+        c = [float(round(float(x))) for x in d["cortes"]]   # cifras cerradas: la tabla se lee mejor sin decimales
         if len(c) == 4 and all(a < b for a, b in zip(c, c[1:])):
             return c, d
     except Exception:
