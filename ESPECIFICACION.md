@@ -33,6 +33,8 @@ Por qué un índice propio: el FWI global del ECMWF tuvo desempeño "excepcional
 
 **Capa de ignición humana (v0.3).** Exposición 0–100 = 1 − (1 − p_caminos)(1 − p_edificios)(1 − p_líneas), con p = peso × exp(−distancia/alcance). Caminos (carreteras y huellas, peso 0,8 y 0,5; alcance 300 m), edificaciones (peso 1,0; 500 m) y líneas de transmisión (línea 0,6, minor_line 0,4; 200 m) desde OpenStreetMap. Se muestra aparte del peligro y se calibrará con registros de causa de incendios de CONAF.
 
+**Calibración por percentiles (v0.3).** Con los cortes provisorios (30/50/65/80) casi toda la cuenca cae en Alto o más incluso con clima suave, por lo que las clases no discriminan. Se reemplazan por percentiles 50/75/90/97 del puntaje diario (15:00) en octubre–abril, calculados con ERA5-Land desde julio de 2000 sobre los cinco puntos (`ilpi/calibracion.py`, `scripts/calibrar_percentiles.py`). Limitación: el ERA5-Land es una malla de ~9 km y puede diferir de las estaciones propias; la clase mide qué tan inusual es el día para la cuenca, no la probabilidad de fuego.
+
 ## 4. Implementación (ver README del repositorio)
 - `ilpi/fireindex.py`: motor del índice (pruebas automáticas, incluido el caso de referencia FFMC 87,7 de Van Wagner y Pickett 1985).
 - `ilpi/colectores.py`: estaciones Ambient, Open-Meteo (ECMWF IFS y GFS) y WRF-SMN.

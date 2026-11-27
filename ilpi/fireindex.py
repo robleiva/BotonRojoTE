@@ -17,7 +17,28 @@ FUEL_WEIGHT = {
 }
 WEIGHTS = {"dry": 0.45, "fuel": 0.35, "spread": 0.20}
 CLASS_BREAKS = [50, 75, 90, 97]       # por percentil (cuando exista distribucion historica de referencia)
-PROV_BREAKS = [30, 50, 65, 80]        # PROVISORIO sobre 100*raw, hasta calibrar con focos de calor
+PROV_BREAKS_BASE = [30, 50, 65, 80]   # PROVISORIO sobre 100*raw, usado mientras no exista calibracion por percentiles
+
+
+def _cargar_cortes():
+    """Cortes de clase por percentiles del clima historico (datos/calibracion_percentiles.json), si existen y son validos."""
+    import json
+    import os
+    if os.environ.get("ILPI_SIN_CALIBRACION") == "1":
+        return list(PROV_BREAKS_BASE), None
+    ruta = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "datos", "calibracion_percentiles.json")
+    try:
+        with open(ruta, encoding="utf-8") as f:
+            d = json.load(f)
+        c = [float(x) for x in d["cortes"]]
+        if len(c) == 4 and all(a < b for a, b in zip(c, c[1:])):
+            return c, d
+    except Exception:
+        pass
+    return list(PROV_BREAKS_BASE), None
+
+
+PROV_BREAKS, CALIBRACION = _cargar_cortes()
 CLASS_NAMES = ["Bajo", "Moderado", "Alto", "Muy alto", "Extremo"]
 
 

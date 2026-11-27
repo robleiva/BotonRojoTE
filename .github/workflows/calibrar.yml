@@ -1,0 +1,39 @@
+name: Calibracion por percentiles
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: ilpi-calibrar
+  cancel-in-progress: false
+
+jobs:
+  calibrar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      - name: Instalar dependencias
+        run: pip install -r requirements.txt
+
+      - name: Pruebas
+        run: python -m pytest -q
+
+      - name: Descargar clima historico y calcular los cortes
+        run: python scripts/calibrar_percentiles.py
+
+      - name: Guardar la calibracion
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add datos/calibracion_percentiles.json
+          git diff --staged --quiet || git commit -m "Auto: calibracion por percentiles $(date -u +%F) [skip ci]"
+          git push

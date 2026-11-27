@@ -17,6 +17,9 @@ de incendios; la referencia oficial es CONAF / SENAPRED.
 El **WRF-SMN** se descarga y archiva (`historico/clima_pronostico.csv`) pero **todavía no alimenta el índice**: los nombres de sus
 variables de humedad y viento no están verificados. En el log de la primera corrida busca las líneas `[WRF] variables del archivo`.
 
+## Calibración por percentiles (clases del índice)
+Mientras no exista `datos/calibracion_percentiles.json`, las clases usan cortes provisorios (30, 50, 65, 80). El flujo **Calibración por percentiles** (Actions, ejecución manual) descarga ~25 años de clima histórico (Open-Meteo, ERA5-Land), corre el mismo índice en los cinco puntos y fija los cortes como percentiles 50, 75, 90 y 97 del puntaje en temporada (octubre a abril). Así *Extremo* significa "entre el 3 % de los días más secos de la historia de la cuenca". No requiere incendios y no los reemplaza: la validación con incendios sigue pendiente.
+
 ## Capa de ignición humana (OpenStreetMap)
 Capa aparte del peligro (no entra en el índice): qué tan cerca está cada celda de caminos, edificaciones y líneas de transmisión. Se genera con el flujo **Capa de ignición (OSM)** (Actions, ejecución manual), que descarga los datos de OpenStreetMap con la Overpass API y guarda `datos/ignicion_90m.npz`. La página la muestra como una pestaña más del mapa. Pesos y alcances en `ilpi/ignicion.py` (supuestos sin calibrar). Datos © colaboradores de OpenStreetMap (licencia ODbL).
 

@@ -1,13 +1,35 @@
 """Pagina HTML corporativa (resumen, mapa por celda, tabla por punto, historial) y JSON con el ultimo indice emitido."""
 import json
 import pandas as pd
+from . import fireindex as fi
 from .config import PUNTOS
 
 DIAS = ["lun", "mar", "mié", "jue", "vie", "sáb", "dom"]
 CLASES = ["Bajo", "Moderado", "Alto", "Muy alto", "Extremo"]
 COLOR = {"Bajo": "#2f9e44", "Moderado": "#f2c200", "Alto": "#f08c00", "Muy alto": "#e03131", "Extremo": "#7b1fa2"}
 TXT = {"Bajo": "#fff", "Moderado": "#1f2933", "Alto": "#fff", "Muy alto": "#fff", "Extremo": "#fff"}
-UMBRAL = {"Bajo": "< 30", "Moderado": "30 – 50", "Alto": "50 – 65", "Muy alto": "65 – 80", "Extremo": "≥ 80"}
+
+
+def _umbral():
+    c = [f"{x:g}" for x in fi.PROV_BREAKS]
+    return {"Bajo": f"< {c[0]}", "Moderado": f"{c[0]} – {c[1]}", "Alto": f"{c[1]} – {c[2]}", "Muy alto": f"{c[2]} – {c[3]}", "Extremo": f"≥ {c[3]}"}
+
+
+UMBRAL = _umbral()
+
+
+def _calibrado():
+    return fi.CALIBRACION is not None
+
+
+def _texto_clases():
+    if _calibrado():
+        d = fi.CALIBRACION
+        return (f"<b>Clases por percentiles:</b> se calcularon con el clima histórico de la cuenca ({d['periodo'].replace(' a ', ' al ')}, "
+                f"{d['dias_temporada']:,} días de temporada) y no con incendios. Bajo: menos del 50 % de los días; Moderado: 50 a 75 %; "
+                f"Alto: 75 a 90 %; Muy alto: 90 a 97 %; Extremo: el 3 % de los días más secos. Cortes de puntaje: "
+                f"{' · '.join(f'{x:g}' for x in fi.PROV_BREAKS)}.").replace(",", ".")
+    return "<b>Clases (provisorias):</b> " + " · ".join(f"{c} {u}" for c, u in UMBRAL.items()) + "."
 
 
 def _dia(f):
@@ -111,6 +133,12 @@ _EXPL_CLASES = {"Bajo": "Combustible húmedo o con pocas posibilidades de propag
 
 
 def _explicacion():
+    if _calibrado():
+        nota = ("Las clases comparan cada día con la historia de la cuenca (por percentiles del clima desde "
+                f"{fi.CALIBRACION['periodo'][:4]}). Extremo significa que el día está entre el 3 % más seco de la temporada; "
+                "no están calibradas con incendios reales.")
+    else:
+        nota = "Los puntajes y las clases son provisorios: aún no se calibran con incendios reales."
     filas = "".join(f"<tr><td><span class='chip' style='background:{COLOR[c]};color:{TXT[c]}'>{c}</span></td>"
                     f"<td>{UMBRAL[c]}</td><td>{_EXPL_CLASES[c]}</td></tr>" for c in CLASES)
     return f"""<section><h2>Qué significa el índice</h2>
@@ -121,7 +149,7 @@ def _explicacion():
 <div><b>Sequedad</b><p>Qué tan seco está el combustible fino muerto (pasto seco y hojarasca). Depende de temperatura, humedad, viento y lluvia de los días anteriores, y es la parte que más pesa en el índice.</p></div>
 <div><b>Combustible</b><p>Cuánto y qué tipo de vegetación hay en el lugar. El pastizal arde más fácil que el bosque nativo; la roca, la nieve y el agua no arden.</p></div>
 <div><b>Propagación</b><p>Qué tan rápido avanzaría el fuego, según el viento y la pendiente. Una ladera empinada con viento a favor acelera el avance.</p></div></div>
-<p class='nota'>Los puntajes y las clases son provisorios: aún no se calibran con incendios reales.</p></section>"""
+<p class='nota'>{nota}</p></section>"""
 
 
 CSS = """
@@ -198,6 +226,8 @@ def html(ilpi_hoy, historial, actualizado, mapa=None, logo=False):
                           colorway=["#00ABE5", "#5BBDB5", "#7AB929", "#414042", "#7F7F7F"], font=dict(family="Nunito, sans-serif", color="#414042"))
         graf = fig.to_html(full_html=False, include_plotlyjs="cdn")
     expl = _explicacion()
+    aviso_clases = ("las clases se definen por percentiles del clima histórico de la cuenca, no con incendios reales."
+                    if _calibrado() else "las clases son provisorias, aún sin calibrar con incendios reales.")
     kpis = _kpis(ilpi_hoy, mapa)
     sec_kpis = f"<div class='kpis'>{kpis}</div>" if kpis else ""
     sec_mapa = (f"<section><h2>Mapa de peligro</h2><p class='nota'>Celdas de 90 m. Se pinta solo donde hay combustible relevante; roca, nieve y agua quedan sin color.</p>"
@@ -212,7 +242,7 @@ def html(ilpi_hoy, historial, actualizado, mapa=None, logo=False):
 <header><div class="w cab">{logo_html}<div><h1>Índice Local de Peligro de Incendios Forestales</h1>
 <p>Cuenca del río Tinguiririca · Tinguiririca Energía</p></div><div class="fecha">Actualizado<br><b>{actualizado}</b></div></div></header>
 <div class="w">
-<div class="aviso"><b>EXPERIMENTAL.</b> Índice relativo (0–100) con pesos y umbrales provisorios, aún sin calibrar con incendios reales.
+<div class="aviso"><b>EXPERIMENTAL.</b> Índice relativo (0–100) con pesos provisorios; {aviso_clases}
 No es un pronóstico oficial ni predice la ocurrencia de incendios. Referencia oficial: CONAF y SENAPRED.</div>
 {sec_kpis}
 {sec_mapa}
@@ -226,7 +256,7 @@ No es un pronóstico oficial ni predice la ocurrencia de incendios. Referencia o
 <details><summary>Metodología y limitaciones</summary><ul>
 <li><b>Datos:</b> estaciones meteorológicas propias (BT Portillo y BT Tinguiririca), modelos ECMWF IFS y GFS (Open-Meteo), terreno desde un DEM de 30 m y combustible desde el catastro de uso de suelo y vegetación de CONAF (actualización 2020), con ESA WorldCover de 10 m como respaldo fuera del límite de la cuenca.</li>
 <li><b>Índice:</b> sequedad del combustible muerto (FFMC, Van Wagner 1987) × tipo de combustible × potencial de propagación (viento y pendiente), como media geométrica ponderada. Pendiente y exposición se consideran en cada celda.</li>
-<li><b>Clases (provisorias):</b> Bajo &lt; 30 · Moderado 30–50 · Alto 50–65 · Muy alto 65–80 · Extremo ≥ 80.</li>
+<li>{_texto_clases()}</li>
 <li><b>Limitaciones:</b> sin nieve ni humedad de la vegetación viva (NDMI); el catastro no distingue la carga ni la continuidad del combustible dentro de cada clase; el viento no incorpora el relieve; el mapa cubre solo la cuenca alta y media.</li>
 </ul></details></section>
 <footer><img src="img/iso-color.png" alt=""><span>Botón Rojo TE · uso interno y experimental. Mapa base y capa de ignición © colaboradores de OpenStreetMap.</span></footer>
