@@ -188,6 +188,7 @@ def main():
     with open(os.path.join(DOCS, "ilpi_ultimo.json"), "w", encoding="utf-8") as f:
         f.write(reporte.json_salida(hoy_df, stamp))
     print("[correo]", alerta.enviar_si_corresponde(hoy_df, stamp, tormenta=tormenta))
+    print("[feed]", alerta.actualizar_feed(hoy_df, stamp, os.path.join(DOCS, "alertas.xml"), hoy, tormenta=tormenta))
     print(hoy_df[hoy_df["Modelo"] == "ECMWF"].pivot(index="Punto", columns="Fecha_Valida", values="Clase").to_string())
 
 

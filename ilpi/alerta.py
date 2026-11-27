@@ -6,8 +6,11 @@ Variables de entorno (secretos del repositorio):
   EMAIL_REMITENTE (opcional, por defecto SMTP_USER)
   EMAIL_MODO      'diario' (por defecto) o 'alerta' (solo si algun punto llega a Alto o mas, o hay tormenta electrica probable)
 """
+import datetime as _dt
 import html as _h
 import os
+import xml.etree.ElementTree as ET
+from email.utils import format_datetime, parsedate_to_datetime
 import smtplib
 import ssl
 from email.message import EmailMessage
@@ -78,6 +81,69 @@ def construir(ilpi_hoy, actualizado, url="", tormenta=None):
     return f"Peligro de incendios Tinguiririca: {c}", cuerpo
 
 
+def url_pagina(env=os.environ):
+    repo = env.get("GITHUB_REPOSITORY", "")
+    return f"https://{repo.split('/')[0].lower()}.github.io/{repo.split('/')[1]}/" if "/" in repo else ""
+
+
+# ------------------------------------------------------------------ fuente RSS para Power Automate
+def _leer_items(ruta):
+    try:
+        raiz = ET.parse(ruta).getroot()
+    except (OSError, ET.ParseError):
+        return []
+    out = []
+    for it in raiz.iter("item"):
+        d = {k: (it.findtext(k) or "") for k in ("title", "link", "guid", "pubDate", "description")}
+        out.append(d)
+    return out
+
+
+def actualizar_feed(ilpi_hoy, actualizado, ruta, hoy, env=os.environ, tormenta=None, ahora=None, max_items=10):
+    """Agrega al archivo RSS (docs/alertas.xml) el aviso del dia si corresponde segun EMAIL_MODO.
+    Un aviso por dia: repetir la corrida el mismo dia no lo duplica (salvo ALERTA_FORZAR=1, para pruebas).
+    Power Automate lee esta fuente y envia el correo desde la cuenta de Outlook de la organizacion. Devuelve texto para el log."""
+    try:
+        modo = env.get("EMAIL_MODO", "diario").strip().lower() or "diario"
+        if not debe_enviar(ilpi_hoy, modo, tormenta):
+            return "modo alerta: ningun punto en Alto o superior ni tormenta probable, no se agrega aviso"
+        ahora = ahora or _dt.datetime.now(_dt.timezone.utc)
+        url = url_pagina(env)
+        asunto, cuerpo = construir(ilpi_hoy, actualizado, url, tormenta)
+        guid = f"ilpi-{hoy:%Y-%m-%d}" + (f"-{ahora:%H%M%S}" if env.get("ALERTA_FORZAR", "").strip() == "1" else "")
+        items = _leer_items(ruta)
+        if any(i["guid"] == guid for i in items):
+            return f"ya hay un aviso para hoy ({guid}): no se duplica"
+        # el disparador de Power Automate exige una fecha estrictamente mayor a la del aviso anterior
+        if items:
+            try:
+                previa = parsedate_to_datetime(items[0]["pubDate"])
+                if ahora <= previa:
+                    ahora = previa + _dt.timedelta(seconds=1)
+            except (TypeError, ValueError):
+                pass
+        nuevo = {"title": asunto, "link": url or "https://github.com", "guid": guid, "pubDate": format_datetime(ahora), "description": cuerpo}
+        items = ([nuevo] + items)[:max_items]
+        rss = ET.Element("rss", version="2.0")
+        ch = ET.SubElement(rss, "channel")
+        ET.SubElement(ch, "title").text = "Peligro de incendios forestales · Cuenca del Tinguiririca"
+        ET.SubElement(ch, "link").text = url or "https://github.com"
+        ET.SubElement(ch, "description").text = "Avisos del Índice Local de Peligro de Incendios (experimental, no oficial)."
+        ET.SubElement(ch, "language").text = "es-CL"
+        ET.SubElement(ch, "lastBuildDate").text = nuevo["pubDate"]
+        for i in items:
+            e = ET.SubElement(ch, "item")
+            for k in ("title", "link", "pubDate", "description"):
+                ET.SubElement(e, k).text = i[k]
+            g = ET.SubElement(e, "guid", isPermaLink="false")
+            g.text = i["guid"]
+        ET.indent(rss)
+        ET.ElementTree(rss).write(ruta, encoding="utf-8", xml_declaration=True)
+        return f"aviso agregado a {os.path.basename(ruta)}: {asunto}"
+    except Exception as e:
+        return f"error al actualizar el feed: {type(e).__name__}"
+
+
 def enviar_si_corresponde(ilpi_hoy, actualizado, env=os.environ, smtp_cls=smtplib.SMTP_SSL, tormenta=None):
     """Devuelve un texto con lo ocurrido (para el log). Nunca lanza: el correo no debe romper la emision."""
     host, destino = env.get("SMTP_HOST", "").strip(), env.get("EMAIL_DESTINO", "").strip()
@@ -87,8 +153,7 @@ def enviar_si_corresponde(ilpi_hoy, actualizado, env=os.environ, smtp_cls=smtpli
         modo = env.get("EMAIL_MODO", "diario").strip().lower()
         if not debe_enviar(ilpi_hoy, modo, tormenta):
             return "modo alerta: ningun punto en Alto o superior, no se envia"
-        repo = env.get("GITHUB_REPOSITORY", "")
-        url = f"https://{repo.split('/')[0].lower()}.github.io/{repo.split('/')[1]}/" if "/" in repo else ""
+        url = url_pagina(env)
         asunto, cuerpo = construir(ilpi_hoy, actualizado, url, tormenta)
         usuario = env.get("SMTP_USER", "").strip()
         m = EmailMessage()
