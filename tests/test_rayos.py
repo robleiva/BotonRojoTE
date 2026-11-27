@@ -33,14 +33,14 @@ def test_por_dia_toma_el_peor_punto_y_filtra_fechas():
     assert ry.por_dia(None).empty
 
 
-def test_correo_incluye_tormenta_y_el_modo_alerta_la_considera():
+def test_correo_no_incluye_tormenta_ni_el_modo_alerta_la_considera():
     t = pd.DataFrame({"Fecha": [pd.Timestamp("2026-12-20")], "CAPE": [900.0], "LI": [-3.0], "Nivel": [2]})
     assert "probable" in alerta._texto_tormenta(t)
     bajo = pd.DataFrame([{"Modelo": "ECMWF", "Clase": "Bajo", "Punto": "A", "Fecha_Valida": pd.Timestamp("2026-12-20"), "Score": 10.0}])
     assert not alerta.debe_enviar(bajo, "alerta")
-    assert alerta.debe_enviar(bajo, "alerta", t)
+    assert not alerta.debe_enviar(bajo, "alerta", t)
     asunto, cuerpo = alerta.construir(bajo, "x", "", t)
-    assert "tormenta" in cuerpo.lower()
+    assert "tormenta" not in cuerpo.lower()
 
 
 def test_seccion_de_pagina():

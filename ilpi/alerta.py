@@ -4,7 +4,7 @@ Variables de entorno (secretos del repositorio):
   SMTP_HOST, SMTP_PORT (465 por defecto, SSL), SMTP_USER, SMTP_PASS   cuenta que envia
   EMAIL_DESTINO   direcciones separadas por coma (p. ej. el listado de difusion)
   EMAIL_REMITENTE (opcional, por defecto SMTP_USER)
-  EMAIL_MODO      'diario' (por defecto) o 'alerta' (solo si algun punto llega a Alto o mas, o hay tormenta electrica probable)
+  EMAIL_MODO      'diario' (por defecto) o 'alerta' (solo si algun punto llega a Alto o mas, )
 """
 import datetime as _dt
 import html as _h
@@ -53,7 +53,7 @@ def debe_enviar(ilpi_hoy, modo="diario", tormenta=None):
     c = clase_maxima(ilpi_hoy)
     if c is not None and ORDEN.index(c) >= ORDEN.index("Alto"):
         return True
-    return tormenta is not None and len(tormenta) > 0 and bool((tormenta["Nivel"] >= 2).any())
+    return False   # la tormenta electrica solo se informa en la pagina, no dispara ni aparece en el correo
 
 
 def turno_del_dia(ahora):
@@ -78,9 +78,7 @@ def construir(ilpi_hoy, actualizado, url="", tormenta=None, turno=""):
                 celdas += (f"<td style='text-align:center;padding:6px 10px'><span style='background:{COLOR[r['Clase']]};color:#fff;"
                            f"border-radius:10px;padding:2px 9px;font-size:12px'>{r['Clase']}</span> {r['Score']:.0f}</td>")
         filas += f"<tr><td style='padding:6px 10px'>{_h.escape(str(pto))}</td>{celdas}</tr>"
-    tt = _texto_tormenta(tormenta)
-    bloque_t = (f"<p style='background:#FFF4D6;border-radius:6px;padding:6px 10px;font-size:12px;margin:10px 0 0'>⚡ {_h.escape(tt)}. "
-                f"Estimación con la inestabilidad del modelo, no un pronóstico de rayos; con combustible seco una tormenta puede iniciar un fuego.</p>") if tt else ""
+    # La tormenta electrica (aproximacion por inestabilidad) se muestra solo en la pagina; en el correo puede llevar a confusion.
     enlace = f"<p style='margin:14px 0 0'><a href='{url}'>Ver el mapa y el detalle</a></p>" if url else ""
     cortes = _cortes()
     rangos = [f"menos de {cortes[0]}", f"{cortes[0]} a {cortes[1]}", f"{cortes[1]} a {cortes[2]}", f"{cortes[2]} a {cortes[3]}", f"{cortes[3]} o más"]
@@ -94,7 +92,7 @@ def construir(ilpi_hoy, actualizado, url="", tormenta=None, turno=""):
               f"<h2 style='color:#00ABE5;font-weight:400;margin:0 0 4px'>Peligro de incendios forestales: máximo {c}</h2>"
               f"<p style='margin:0 0 12px;color:#7F7F7F;font-size:13px'>Cuenca del río Tinguiririca. Actualizado {actualizado}.</p>"
               f"<table style='border-collapse:collapse;width:100%;font-size:14px'><tr><th style='text-align:left;font-weight:400;color:#5b6b76;padding:6px 10px;background:#E5F5FD'>Punto</th>{cab}</tr>{filas}</table>"
-              f"{bloque_t}{bloque_l}{enlace}"
+              f"{bloque_l}{enlace}"
               f"<p style='font-size:11px;color:#7F7F7F;margin:14px 0 0'>Experimental: índice relativo, aún sin calibrar con incendios reales. "
               f"No es un pronóstico oficial; la referencia oficial es CONAF y SENAPRED.</p></div>")
     return f"Peligro de incendios Tinguiririca: {c}", cuerpo
