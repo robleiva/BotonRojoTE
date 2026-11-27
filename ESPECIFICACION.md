@@ -31,6 +31,8 @@ Por qué un índice propio: el FWI global del ECMWF tuvo desempeño "excepcional
 | Estado hídrico vegetación | NDMI Sentinel‑2 (10–20 m) / MODIS | **Pendiente** |
 | Incendios para calibrar y validar | NASA FIRMS VIIRS; registros CONAF | FIRMS en `fetch_data.py` (requiere MAP_KEY); CONAF por solicitar |
 
+**Capa de ignición humana (v0.3).** Exposición 0–100 = 1 − (1 − p_caminos)(1 − p_edificios)(1 − p_líneas), con p = peso × exp(−distancia/alcance). Caminos (carreteras y huellas, peso 0,8 y 0,5; alcance 300 m), edificaciones (peso 1,0; 500 m) y líneas de transmisión (línea 0,6, minor_line 0,4; 200 m) desde OpenStreetMap. Se muestra aparte del peligro y se calibrará con registros de causa de incendios de CONAF.
+
 ## 4. Implementación (ver README del repositorio)
 - `ilpi/fireindex.py`: motor del índice (pruebas automáticas, incluido el caso de referencia FFMC 87,7 de Van Wagner y Pickett 1985).
 - `ilpi/colectores.py`: estaciones Ambient, Open-Meteo (ECMWF IFS y GFS) y WRF-SMN.

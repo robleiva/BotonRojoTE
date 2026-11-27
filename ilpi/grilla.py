@@ -115,7 +115,7 @@ def clima_celdas(clima, w, z_celda, puntos=PUNTOS):
     return {"T": t, "RH": rh, "V": v, "DIR": direc, "PP24": _idw(clima["PP24"], w)}
 
 
-def calcular_mapa(registrado, pron, hoy, ruta_terreno, puntos=PUNTOS, modelo="ECMWF"):
+def calcular_mapa(registrado, pron, hoy, ruta_terreno, puntos=PUNTOS, modelo="ECMWF", ruta_ignicion=None):
     """Devuelve dict: fechas (de hoy en adelante), score [dia, h, w], clase_idx, mascara de combustible y resumen."""
     ter = cargar_terreno(ruta_terreno)
     r, k, lat, lon = _coords(ter)
@@ -155,7 +155,28 @@ def calcular_mapa(registrado, pron, hoy, ruta_terreno, puntos=PUNTOS, modelo="EC
         ha = 0.81  # 90 m x 90 m
         resumen.append({"Fecha": fe, "Ha_combustible": round(float(s.size * ha)),
                         **{n: round(float((cl == j).sum() * ha)) for j, n in enumerate(fi.CLASS_NAMES)}})
-    return {"fechas": dias, "score": S, "combustible": comb, "limites": limites(ter), "resumen": resumen}
+    return {"fechas": dias, "score": S, "combustible": comb, "limites": limites(ter), "resumen": resumen,
+            "ignicion": cargar_ignicion(ruta_ignicion, ter["valido"]) if ruta_ignicion else None}
+
+
+def cargar_ignicion(ruta, valido):
+    """Exposicion a ignicion humana (0-100) si el archivo existe y calza con la grilla; si no, None."""
+    try:
+        e = np.load(ruta)["exposicion"]
+    except Exception:
+        return None
+    return np.where(valido, e, 0).astype(np.uint8) if e.shape == valido.shape else None
+
+
+def png_ignicion_base64(exp, minimo=8):
+    """PNG RGBA: de cian claro (poca exposicion) a gris oscuro (mucha); bajo el minimo = transparente."""
+    t = np.clip((exp.astype(float) - minimo) / (100 - minimo), 0, 1)[..., None]
+    a, b = np.array([0, 171, 229, 110.0]), np.array([65, 64, 66, 225.0])
+    img = (a + (b - a) * t).astype(np.uint8)
+    img[exp < minimo] = 0
+    buf = io.BytesIO()
+    Image.fromarray(img, "RGBA").save(buf, "PNG", optimize=True)
+    return base64.b64encode(buf.getvalue()).decode()
 
 
 def png_base64(score2d, combustible):

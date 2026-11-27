@@ -17,6 +17,9 @@ de incendios; la referencia oficial es CONAF / SENAPRED.
 El **WRF-SMN** se descarga y archiva (`historico/clima_pronostico.csv`) pero **todavía no alimenta el índice**: los nombres de sus
 variables de humedad y viento no están verificados. En el log de la primera corrida busca las líneas `[WRF] variables del archivo`.
 
+## Capa de ignición humana (OpenStreetMap)
+Capa aparte del peligro (no entra en el índice): qué tan cerca está cada celda de caminos, edificaciones y líneas de transmisión. Se genera con el flujo **Capa de ignición (OSM)** (Actions, ejecución manual), que descarga los datos de OpenStreetMap con la Overpass API y guarda `datos/ignicion_90m.npz`. La página la muestra como una pestaña más del mapa. Pesos y alcances en `ilpi/ignicion.py` (supuestos sin calibrar). Datos © colaboradores de OpenStreetMap (licencia ODbL).
+
 ## Correo diario (opcional)
 Si defines estos secretos del repositorio, el flujo envía cada mañana un resumen por correo: `SMTP_HOST`, `SMTP_PORT` (465 por defecto), `SMTP_USER`, `SMTP_PASS` y `EMAIL_DESTINO` (el listado de difusión; varias direcciones separadas por coma). Opcionales: `EMAIL_REMITENTE` y `EMAIL_MODO` (`diario`, por defecto, o `alerta`, que solo envía si algún punto llega a Alto o más). Sin `SMTP_HOST` y `EMAIL_DESTINO` no se envía nada. En el log busca la línea `[correo]`.
 

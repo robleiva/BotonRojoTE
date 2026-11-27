@@ -133,7 +133,7 @@ def main():
     hoy_df = ilpi
     mapa = None
     try:
-        mapa = grilla.calcular_mapa(reg_total, pron, hoy, F_GRILLA)
+        mapa = grilla.calcular_mapa(reg_total, pron, hoy, F_GRILLA, ruta_ignicion=F_IGNICION)
         print(f"[mapa] {len(mapa['fechas'])} dias, {mapa['resumen'][0]['Ha_combustible']} ha con combustible")
     except Exception as e:                      # el mapa nunca debe impedir la emision por punto
         print(f"[mapa] omitido: {e}")

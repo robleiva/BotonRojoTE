@@ -82,7 +82,8 @@ def _mapa_html(mapa, ilpi_hoy):
     for n, m in PUNTOS.items():
         g = ilpi_hoy[(ilpi_hoy["Punto"] == n) & (ilpi_hoy["Modelo"] == "ECMWF")].sort_values("Fecha_Valida")
         pts.append({"n": n, "lat": m["lat"], "lon": m["lon"], "s": [f"{x:.0f}" for x in g["Score"]], "c": list(g["Clase"])})
-    datos = json.dumps({"lim": mapa["limites"], "dias": dias, "pts": pts, "color": COLOR}, ensure_ascii=False)
+    ign = grilla.png_ignicion_base64(mapa["ignicion"]) if mapa.get("ignicion") is not None else None
+    datos = json.dumps({"lim": mapa["limites"], "dias": dias, "pts": pts, "color": COLOR, "ign": ign}, ensure_ascii=False)
     return MAPA_TPL.replace("__DATOS__", datos)
 
 
@@ -93,10 +94,14 @@ MAPA_TPL = """<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/
 L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:17,attribution:"&copy; OpenStreetMap"}).addTo(m);
 m.fitBounds(D.lim);var capa=null,btns=[];
 function ver(i){if(capa)m.removeLayer(capa);capa=L.imageOverlay("data:image/png;base64,"+D.dias[i].png,D.lim,{opacity:0.85,interactive:false}).addTo(m);
-btns.forEach(function(b,j){b.className=j==i?"tab on":"tab"});}
+btns.forEach(function(b,j){b.className=j==i?"tab on":"tab"});document.getElementById("leyign").style.display="none";}
+function verIgn(){if(capa)m.removeLayer(capa);capa=L.imageOverlay("data:image/png;base64,"+D.ign,D.lim,{opacity:0.85,interactive:false}).addTo(m);
+btns.forEach(function(b,j){b.className=j==D.dias.length?"tab on":"tab"});document.getElementById("leyign").style.display="block";}
 D.dias.forEach(function(d,i){var b=document.createElement("button");b.textContent=d.etq;b.className="tab";b.onclick=function(){ver(i)};document.getElementById("dias").appendChild(b);btns.push(b)});
 D.pts.forEach(function(p){var c=D.color[p.c[0]]||"#555";L.circleMarker([p.lat,p.lon],{radius:8,color:"#414042",weight:2,fillColor:c,fillOpacity:1}).addTo(m).bindTooltip("<b>"+p.n+"</b><br>"+p.c.map(function(x,k){return x+" "+p.s[k]}).join("<br>"));});
-ver(0);})();</script>"""
+if(D.ign){var bi=document.createElement("button");bi.textContent="Ignición humana";bi.className="tab";bi.onclick=verIgn;document.getElementById("dias").appendChild(bi);btns.push(bi);}
+ver(0);})();</script>
+<p id="leyign" class="nota" style="display:none;margin-top:10px">Cercanía a caminos, edificaciones y líneas de transmisión (OpenStreetMap). Cian claro: poca exposición; gris oscuro: mucha. Es una capa aparte: no entra en el índice de peligro y no está calibrada.</p>"""
 
 _EXPL_CLASES = {"Bajo": "Combustible húmedo o con pocas posibilidades de propagación. Condiciones poco favorables para un fuego.",
     "Moderado": "Combustible algo seco. Un fuego puede iniciarse y avanzar con dificultad; precaución con faenas que usen fuego o chispas.",
@@ -224,7 +229,7 @@ No es un pronóstico oficial ni predice la ocurrencia de incendios. Referencia o
 <li><b>Clases (provisorias):</b> Bajo &lt; 30 · Moderado 30–50 · Alto 50–65 · Muy alto 65–80 · Extremo ≥ 80.</li>
 <li><b>Limitaciones:</b> sin nieve ni humedad de la vegetación viva (NDMI); el catastro no distingue la carga ni la continuidad del combustible dentro de cada clase; el viento no incorpora el relieve; el mapa cubre solo la cuenca alta y media.</li>
 </ul></details></section>
-<footer><img src="img/iso-color.png" alt=""><span>Botón Rojo TE · uso interno y experimental. Mapa base © OpenStreetMap.</span></footer>
+<footer><img src="img/iso-color.png" alt=""><span>Botón Rojo TE · uso interno y experimental. Mapa base y capa de ignición © colaboradores de OpenStreetMap.</span></footer>
 </div></body></html>"""
 
 
