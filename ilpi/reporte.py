@@ -280,7 +280,8 @@ def html(ilpi_hoy, historial, actualizado, mapa=None, logo=False):
                 f"{_mapa_html(mapa, ilpi_hoy)}</section>") if mapa else ""
     sec_barras = (f"<section><h2>Superficie con combustible por clase de peligro</h2>"
                   f"<p class='nota'>Proporción de la superficie con combustible en cada clase, por día.</p>{_barras(mapa)}</section>") if mapa else ""
-    sec_graf = f"<section><h2>Historial</h2><p class='nota'>Cada casilla es un día en un punto: el color es la clase de peligro y el número, el puntaje (0 = combustible húmedo tras lluvia). Gris: sin dato. Las clases se muestran con los cortes vigentes, también para días anteriores.</p>{graf}<div class='leyenda'>{''.join(f"<span class='ley'><i style='background:{COLOR[c]}'></i>{c}</span>" for c in CLASES)}</div></section>" if graf else ""
+    ley_hist = "<div class='leyenda'>" + "".join("<span class='ley'><i style='background:%s'></i>%s</span>" % (COLOR[c], c) for c in CLASES) + "</div>"
+    sec_graf = f"<section><h2>Historial</h2><p class='nota'>Cada casilla es un día en un punto: el color es la clase de peligro y el número, el puntaje (0 = combustible húmedo tras lluvia). Gris: sin dato. Las clases se muestran con los cortes vigentes, también para días anteriores.</p>{graf}{ley_hist}</section>" if graf else ""
     logo_html = "<img src='img/logo-white.png' alt='Tinguiririca Energía'>" if logo else ""
     return f"""<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1"><title>Peligro de incendios forestales · Cuenca del Tinguiririca</title>
