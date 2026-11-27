@@ -29,6 +29,7 @@ F_REG = os.path.join(HIST, "clima_registrado.csv")      # 15 h por dia: lo que "
 F_PRON = os.path.join(HIST, "clima_pronostico.csv")     # 15 h por dia, por modelo, por emision
 F_ESTADO = os.path.join(HIST, "estado_ffmc.csv")        # estado diario del FFMC por punto
 F_ILPI = os.path.join(HIST, "ilpi_diario.csv")          # indice emitido (para verificar despues)
+F_NIEVE = os.path.join(HIST, "nieve_diaria.csv")        # profundidad de nieve e isoterma 0 C por punto y dia (modelo)
 F_FOCOS = os.path.join(HIST, "focos_firms.csv")         # focos de calor NASA FIRMS acumulados
 F_GRILLA = os.path.join(DATOS, "terreno_90m.npz")         # DEM, pendiente, exposicion y combustible a 90 m
 F_LIMITE = os.path.join(DATOS, "limite_cuenca.json")     # contorno de la cuenca para el mapa

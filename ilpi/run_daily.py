@@ -4,7 +4,7 @@ import os
 import datetime as dt
 import numpy as np
 import pandas as pd
-from . import colectores as col, pipeline as pl, reporte, grilla, firms, alerta
+from . import colectores as col, pipeline as pl, reporte, grilla, firms, alerta, nieve as nv
 from .config import *
 
 
@@ -83,11 +83,25 @@ def main():
     reg_total = _upsert(reg, prev_reg, ["Punto", "Fecha"])
     reg_total.to_csv(F_REG, index=False)
 
+    # 3b. Nieve (modelo): profundidad e isoterma 0 C por punto. Si falla, el indice no cambia.
+    nv_nuevo = []
+    for pto, m in PUNTOS.items():
+        d = nv.fetch(m["lat"], m["lon"], past_days=3, forecast_days=DIAS_PRON + 1)
+        if not d.empty:
+            nv_nuevo.append(d.assign(Punto=pto))
+    nieve_df = _upsert(pd.concat(nv_nuevo)[nv.COLS], _leer(F_NIEVE, ["Fecha"]), ["Punto", "Fecha"]) if nv_nuevo else _leer(F_NIEVE, ["Fecha"])
+    if not nieve_df.empty:
+        nieve_df.to_csv(F_NIEVE, index=False)
+    ult = nieve_df[nieve_df["Fecha"] == hoy] if not nieve_df.empty else nieve_df
+    print(f"[nieve] {len(nv_nuevo)}/{len(PUNTOS)} puntos con dato; hoy: " +
+          (", ".join(f"{r.Punto} {r.NIEVE:.2f} m, isoterma 0 C {r.FZL:.0f} m" for r in ult.itertuples()) if not ult.empty else "sin dato (no se aplica nieve)"))
+
     # 4. Estado + indice
     estado = _leer(F_ESTADO, ["Fecha"])
     if estado.empty:
         estado = pd.DataFrame(columns=["Punto", "Fecha", "FFMC", "M", "Calidad", "Fuente"])
     nuevo_estado, ilpi = pl.calcular(reg_total, pron, estado, cargar_terreno(), hoy)
+    ilpi = nv.marcar_puntos(ilpi, nieve_df, PUNTOS)
     pd.concat([estado, nuevo_estado]).drop_duplicates(["Punto", "Fecha"], keep="last").to_csv(F_ESTADO, index=False)
     hist = _upsert(ilpi, _leer(F_ILPI, ["Emision", "Fecha_Valida"]), ["Emision", "Punto", "Modelo", "Fecha_Valida"])
     hist.to_csv(F_ILPI, index=False)
@@ -133,7 +147,7 @@ def main():
     hoy_df = ilpi
     mapa = None
     try:
-        mapa = grilla.calcular_mapa(reg_total, pron, hoy, F_GRILLA, ruta_ignicion=F_IGNICION)
+        mapa = grilla.calcular_mapa(reg_total, pron, hoy, F_GRILLA, ruta_ignicion=F_IGNICION, nieve=nieve_df)
         print(f"[mapa] {len(mapa['fechas'])} dias, {mapa['resumen'][0]['Ha_combustible']} ha con combustible")
     except Exception as e:                      # el mapa nunca debe impedir la emision por punto
         print(f"[mapa] omitido: {e}")

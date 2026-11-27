@@ -12,7 +12,7 @@ import numpy as np
 import pandas as pd
 from PIL import Image
 
-from . import fireindex as fi
+from . import fireindex as fi, nieve as nv
 from .config import PUNTOS, F_INICIAL
 
 HIST_DIAS = 30          # dias de clima registrado para reconstruir el FFMC de cada celda
@@ -115,7 +115,7 @@ def clima_celdas(clima, w, z_celda, puntos=PUNTOS):
     return {"T": t, "RH": rh, "V": v, "DIR": direc, "PP24": _idw(clima["PP24"], w)}
 
 
-def calcular_mapa(registrado, pron, hoy, ruta_terreno, puntos=PUNTOS, modelo="ECMWF", ruta_ignicion=None):
+def calcular_mapa(registrado, pron, hoy, ruta_terreno, puntos=PUNTOS, modelo="ECMWF", ruta_ignicion=None, nieve=None):
     """Devuelve dict: fechas (de hoy en adelante), score [dia, h, w], clase_idx, mascara de combustible y resumen."""
     ter = cargar_terreno(ruta_terreno)
     r, k, lat, lon = _coords(ter)
@@ -129,7 +129,8 @@ def calcular_mapa(registrado, pron, hoy, ruta_terreno, puntos=PUNTOS, modelo="EC
     asp_dry = ter["aspect"][r, k]
     slope, fuel = ter["slope"][r, k], ter["fuel"][r, k]
     fuel_f = fi.fuel_factor(fuel, 0.5)          # sin NDMI: neutro (igual que el indice por punto)
-    dias, scores = [], []
+    prof, cota = nv.perfil(nieve, fechas)
+    dias, scores, cubs = [], [], []
     for i, fe in enumerate(fechas):
         ok = np.isfinite(cc["T"][i]) & np.isfinite(cc["RH"][i]) & np.isfinite(cc["V"][i]) & np.isfinite(cc["PP24"][i])
         f_new, m_new = fi.ffmc_step(f, np.nan_to_num(cc["T"][i]), np.nan_to_num(cc["RH"][i], nan=50.0),
@@ -139,8 +140,11 @@ def calcular_mapa(registrado, pron, hoy, ruta_terreno, puntos=PUNTOS, modelo="EC
         if fe >= hoy:
             dry = fi.dryness(m, asp_dry)
             spr = fi.spread(np.nan_to_num(cc["V"][i]), cc["DIR"][i], slope, asp)
-            raw = fi.raw_index(dry, fuel_f, spr)
-            scores.append(fi.score_provisional(raw))
+            cub = nv.cubierta(prof[i], cota[i], z)
+            raw = fi.raw_index(dry, fuel_f, spr, snow_m=np.where(cub, 1.0, 0.0))
+            sc = fi.score_provisional(raw)
+            scores.append(np.where(cub, np.nan, sc))
+            cubs.append(cub)
             dias.append(fe)
     h, wd = ter["valido"].shape
     S = np.full((len(dias), h, wd), np.nan)
@@ -148,14 +152,19 @@ def calcular_mapa(registrado, pron, hoy, ruta_terreno, puntos=PUNTOS, modelo="EC
         S[i][r, k] = s
     comb = np.zeros((h, wd), bool)
     comb[r, k] = fuel >= FUEL_MIN
+    N = np.zeros((len(dias), h, wd), bool)
+    for i, c in enumerate(cubs):
+        N[i][r, k] = c
     resumen = []
     for i, fe in enumerate(dias):
-        s = scores[i][fuel >= FUEL_MIN]
+        s = scores[i][(fuel >= FUEL_MIN) & ~cubs[i]]
         cl = np.searchsorted(fi.PROV_BREAKS, s, side="right")
         ha = 0.81  # 90 m x 90 m
         resumen.append({"Fecha": fe, "Ha_combustible": round(float(s.size * ha)),
+                        "Ha_nieve": round(float(cubs[i].sum() * ha)),
                         **{n: round(float((cl == j).sum() * ha)) for j, n in enumerate(fi.CLASS_NAMES)}})
     return {"fechas": dias, "score": S, "combustible": comb, "limites": limites(ter), "resumen": resumen,
+            "nieve": N if N.any() else None,
             "ignicion": cargar_ignicion(ruta_ignicion, ter["valido"]) if ruta_ignicion else None}
 
 
@@ -179,10 +188,15 @@ def png_ignicion_base64(exp, minimo=8):
     return base64.b64encode(buf.getvalue()).decode()
 
 
-def png_base64(score2d, combustible):
-    """PNG RGBA (paleta por clase; sin combustible = transparente)."""
+COLOR_NIEVE = (196, 224, 242, 215)
+
+
+def png_base64(score2d, combustible, nieve2d=None):
+    """PNG RGBA (paleta por clase; sin combustible = transparente; nieve en celeste claro)."""
     h, w = score2d.shape
     img = np.zeros((h, w, 4), np.uint8)
+    if nieve2d is not None:
+        img[nieve2d] = COLOR_NIEVE
     cl = np.searchsorted(fi.PROV_BREAKS, np.nan_to_num(score2d, nan=0.0), side="right")
     for j, n in enumerate(fi.CLASS_NAMES):
         m = combustible & np.isfinite(score2d) & (cl == j)

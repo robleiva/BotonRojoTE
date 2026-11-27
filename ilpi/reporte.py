@@ -47,6 +47,9 @@ def _celda(g):
         return "<td class='vacio'>–</td>"
     p = g[g["Modelo"] == "ECMWF"]
     base = p.iloc[0] if not p.empty else g.iloc[0]
+    if base.get("Nieve") == True:                       # noqa: E712  (NaN en filas antiguas)
+        return ("<td><span class='chip' style='background:#C4E0F2;color:#414042'>Nieve</span>"
+                "<div class='sub'>sin combustible expuesto</div></td>")
     lo, hi = g["Score"].min(), g["Score"].max()
     rango = f"{lo:.0f}" if abs(hi - lo) < 1 else f"{lo:.0f}–{hi:.0f}"
     aviso = "<sup title='Día con datos incompletos'>*</sup>" if base["Calidad"] != "ok" else ""
@@ -77,6 +80,10 @@ def _kpis(ilpi_hoy, mapa):
             flecha = "▲" if sube > 0 else ("▼" if sube < 0 else "■")
             tarjetas.append((f"Tendencia a {_dia(u['Fecha'])}", f"<span class='num'>{flecha} {abs(sube):,}</span> ha".replace(",", "."),
                              "variación de la superficie en Alto o superior"))
+    if mapa and mapa.get("resumen") and mapa["resumen"][0].get("Ha_nieve", 0) > 0:
+        r0 = mapa["resumen"][0]
+        tarjetas.append(("Superficie con nieve", f"<span class='num'>{r0['Ha_nieve']:,}</span> ha".replace(",", "."),
+                         "estimada con el modelo; se excluye del cálculo"))
     return "".join(f"<div class='kpi'><div class='kpi-t'>{t}</div><div class='kpi-v'>{v}</div><div class='kpi-s'>{s}</div></div>"
                    for t, v, s in tarjetas)
 
@@ -109,22 +116,24 @@ def _mapa_html(mapa, ilpi_hoy):
     """Mapa Leaflet con una capa PNG por dia, marcadores de los puntos y leyenda."""
     from . import grilla
     from .config import PUNTOS
-    dias = [{"etq": _dia(f), "png": grilla.png_base64(mapa["score"][i], mapa["combustible"])} for i, f in enumerate(mapa["fechas"])]
+    N = mapa.get("nieve")
+    dias = [{"etq": _dia(f), "png": grilla.png_base64(mapa["score"][i], mapa["combustible"], None if N is None else N[i])} for i, f in enumerate(mapa["fechas"])]
     pts = []
     for n, m in PUNTOS.items():
         g = ilpi_hoy[(ilpi_hoy["Punto"] == n) & (ilpi_hoy["Modelo"] == "ECMWF")].sort_values("Fecha_Valida")
         pts.append({"n": n, "lat": m["lat"], "lon": m["lon"], "s": [f"{x:.0f}" for x in g["Score"]], "c": list(g["Clase"])})
     ign = grilla.png_ignicion_base64(mapa["ignicion"]) if mapa.get("ignicion") is not None else None
-    datos = json.dumps({"lim": mapa["limites"], "dias": dias, "pts": pts, "color": COLOR, "ign": ign, "cuenca": _limite_cuenca()}, ensure_ascii=False)
+    datos = json.dumps({"lim": mapa["limites"], "dias": dias, "pts": pts, "color": COLOR, "ign": ign, "cuenca": _limite_cuenca(), "nieve": N is not None}, ensure_ascii=False)
     return MAPA_TPL.replace("__DATOS__", datos)
 
 
 MAPA_TPL = """<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <div class="tabs" id="dias"></div><div id="mapa"></div>
+<p class="nota" id="leynieve" style="margin-top:10px"><span style="display:inline-block;width:12px;height:12px;border-radius:3px;background:#C4E0F2;margin-right:6px;vertical-align:-1px"></span>Nieve (estimada con el modelo): sin peligro de incendio.</p>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>(function(){var D=__DATOS__;var m=L.map("mapa",{scrollWheelZoom:false});
 L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:17,attribution:"&copy; OpenStreetMap"}).addTo(m);
-m.fitBounds(D.lim);var capa=null,btns=[];
+m.fitBounds(D.lim);var capa=null,btns=[];if(!D.nieve)document.getElementById("leynieve").style.display="none";
 m.createPane("cuenca");m.getPane("cuenca").style.zIndex=450;m.getPane("cuenca").style.pointerEvents="none";
 D.cuenca.forEach(function(r){L.polygon(r,{pane:"cuenca",color:"#414042",weight:2.5,dashArray:"7 5",fill:false,interactive:false}).addTo(m);});
 function ver(i){if(capa)m.removeLayer(capa);capa=L.imageOverlay("data:image/png;base64,"+D.dias[i].png,D.lim,{opacity:0.85,interactive:false}).addTo(m);
@@ -304,7 +313,7 @@ No es un pronóstico oficial ni predice la ocurrencia de incendios. Referencia o
 <li><b>Datos:</b> estaciones meteorológicas propias (BT Portillo y BT Tinguiririca), modelos ECMWF IFS y GFS (Open-Meteo), terreno desde un DEM de 30 m y combustible desde el catastro de uso de suelo y vegetación de CONAF (actualización 2020), con ESA WorldCover de 10 m como respaldo fuera del límite de la cuenca.</li>
 <li><b>Índice:</b> sequedad del combustible muerto (FFMC, Van Wagner 1987) × tipo de combustible × potencial de propagación (viento y pendiente), como media geométrica ponderada. Pendiente y exposición se consideran en cada celda.</li>
 <li>{_texto_clases()}</li>
-<li><b>Limitaciones:</b> sin nieve ni humedad de la vegetación viva (NDMI); el catastro no distingue la carga ni la continuidad del combustible dentro de cada clase; el viento no incorpora el relieve; el mapa cubre solo la cuenca alta y media.</li>
+<li><b>Limitaciones:</b> la nieve es una estimación del modelo (profundidad y altura de la isoterma 0 °C), sin satélite, y no hay humedad de la vegetación viva (NDMI); el catastro no distingue la carga ni la continuidad del combustible dentro de cada clase; el viento no incorpora el relieve; el mapa cubre solo la cuenca alta y media.</li>
 </ul></details></section>
 <footer><img src="img/iso-color.png" alt=""><span>Botón Rojo TE · uso interno y experimental. Mapa base y capa de ignición © colaboradores de OpenStreetMap.</span></footer>
 </div></body></html>"""

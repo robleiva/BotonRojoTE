@@ -74,3 +74,16 @@ def test_faltantes_no_rompen_y_png():
     assert np.isfinite(m["score"][0][m["combustible"]]).all()
     b = grilla.png_base64(m["score"][0], m["combustible"])
     assert len(b) > 100
+
+
+def test_nieve_apaga_el_peligro_en_altura():
+    reg, pr = _clima()
+    fechas = pd.date_range(HOY - pd.Timedelta(days=3), HOY + pd.Timedelta(days=3))
+    nieve = pd.DataFrame([{"Punto": p, "Fecha": f, "NIEVE": 0.5, "FZL": 2300.0} for p in PUNTOS for f in fechas])
+    sin = grilla.calcular_mapa(reg, pr, HOY, RUTA)
+    con = grilla.calcular_mapa(reg, pr, HOY, RUTA, nieve=nieve)
+    assert sin["nieve"] is None and con["nieve"] is not None
+    assert con["resumen"][0]["Ha_nieve"] > 0
+    assert con["resumen"][0]["Ha_combustible"] < sin["resumen"][0]["Ha_combustible"]
+    assert np.isnan(con["score"][0][con["nieve"][0]]).all()
+    assert len(grilla.png_base64(con["score"][0], con["combustible"], con["nieve"][0])) > 100
