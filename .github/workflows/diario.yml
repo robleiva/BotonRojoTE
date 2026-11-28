@@ -3,6 +3,8 @@ name: ILPI diario
 on:
   schedule:
     - cron: '30 8 * * *'      # 08:30 UTC = 05:30 (verano) / 04:30 (invierno) hora de Chile: aviso de la mañana, para el día en curso
+    - cron: '50 9 * * *'      # respaldo por si GitHub omite la ejecución de las 08:30 UTC (no duplica el aviso: ya existe el del día)
+    - cron: '50 10 * * *'     # segundo respaldo
   workflow_dispatch:
 
 concurrency:
